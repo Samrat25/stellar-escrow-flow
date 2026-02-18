@@ -1,27 +1,57 @@
+import { useState, useCallback } from 'react';
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import Navbar from './components/Navbar';
 import Index from "./pages/Index";
+import Dashboard from "./pages/Dashboard";
+import CreateEscrow from "./pages/CreateEscrow";
+import FeedbackPage from "./pages/FeedbackPage";
 import NotFound from "./pages/NotFound";
+import { connectWallet } from './lib/stellar';
+import { toast } from 'sonner';
 
 const queryClient = new QueryClient();
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Index />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
-);
+const App = () => {
+  const [walletAddress, setWalletAddress] = useState<string | null>(null);
+  const [connecting, setConnecting] = useState(false);
+
+  const handleConnect = useCallback(async () => {
+    setConnecting(true);
+    try {
+      const address = await connectWallet();
+      if (address) {
+        setWalletAddress(address);
+        toast.success('Wallet connected!', { description: `${address.slice(0, 8)}...${address.slice(-4)}` });
+      }
+    } catch {
+      toast.error('Failed to connect wallet');
+    } finally {
+      setConnecting(false);
+    }
+  }, []);
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <Navbar walletAddress={walletAddress} onConnect={handleConnect} connecting={connecting} />
+          <Routes>
+            <Route path="/" element={<Index />} />
+            <Route path="/dashboard" element={<Dashboard walletAddress={walletAddress} />} />
+            <Route path="/create" element={<CreateEscrow />} />
+            <Route path="/feedback" element={<FeedbackPage />} />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </BrowserRouter>
+      </TooltipProvider>
+    </QueryClientProvider>
+  );
+};
 
 export default App;
