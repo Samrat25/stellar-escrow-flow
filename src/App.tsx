@@ -3,10 +3,11 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Navbar from './components/Navbar';
 import Index from "./pages/Index";
-import Dashboard from "./pages/Dashboard";
+import ClientDashboard from "./pages/ClientDashboard";
+import FreelancerDashboard from "./pages/FreelancerDashboard";
 import CreateEscrow from "./pages/CreateEscrow";
 import FeedbackPage from "./pages/FeedbackPage";
 import NotFound from "./pages/NotFound";
@@ -43,8 +44,18 @@ const App = () => {
           <Navbar walletAddress={walletAddress} onConnect={handleConnect} connecting={connecting} />
           <Routes>
             <Route path="/" element={<Index />} />
-            <Route path="/dashboard" element={<Dashboard walletAddress={walletAddress} />} />
-            <Route path="/create" element={<CreateEscrow />} />
+            <Route path="/dashboard" element={
+              walletAddress ? <Navigate to="/dashboard/client" replace /> : <Navigate to="/" replace />
+            } />
+            <Route path="/dashboard/client" element={
+              walletAddress ? <ClientDashboard walletAddress={walletAddress} /> : <Navigate to="/" replace />
+            } />
+            <Route path="/dashboard/freelancer" element={
+              walletAddress ? <FreelancerDashboard walletAddress={walletAddress} /> : <Navigate to="/" replace />
+            } />
+            <Route path="/create" element={
+              walletAddress ? <CreateEscrow walletAddress={walletAddress} /> : <Navigate to="/" replace />
+            } />
             <Route path="/feedback" element={<FeedbackPage />} />
             <Route path="*" element={<NotFound />} />
           </Routes>

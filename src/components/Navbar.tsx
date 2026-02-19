@@ -12,7 +12,8 @@ interface NavbarProps {
 }
 
 const navItems = [
-  { label: 'Dashboard', path: '/dashboard' },
+  { label: 'Client', path: '/dashboard/client' },
+  { label: 'Freelancer', path: '/dashboard/freelancer' },
   { label: 'Create Escrow', path: '/create' },
   { label: 'Feedback', path: '/feedback' },
 ];

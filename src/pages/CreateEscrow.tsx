@@ -8,12 +8,17 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { MilestoneInput } from '@/types/escrow';
 import { isValidStellarAddress } from '@/lib/stellar';
+import { api } from '@/lib/api';
 import { toast } from 'sonner';
 
-const CreateEscrow = () => {
+interface CreateEscrowProps {
+  walletAddress: string | null;
+}
+
+const CreateEscrow = ({ walletAddress }: CreateEscrowProps) => {
   const navigate = useNavigate();
   const [freelancerWallet, setFreelancerWallet] = useState('');
-  const [deadline, setDeadline] = useState('');
+  const [reviewWindowDays, setReviewWindowDays] = useState('3');
   const [milestones, setMilestones] = useState<MilestoneInput[]>([
     { description: '', amount: '' },
   ]);
@@ -37,27 +42,65 @@ const CreateEscrow = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (!walletAddress) {
+      toast.error('Please connect your wallet first');
+      return;
+    }
+
     if (!isValidStellarAddress(freelancerWallet)) {
       toast.error('Invalid Stellar wallet address');
       return;
     }
-    if (!deadline) {
-      toast.error('Please set a deadline');
+
+    if (freelancerWallet === walletAddress) {
+      toast.error('Cannot create escrow with yourself');
       return;
     }
+
+    const reviewDays = parseInt(reviewWindowDays);
+    if (!reviewDays || reviewDays < 1) {
+      toast.error('Review window must be at least 1 day');
+      return;
+    }
+
     if (milestones.some(m => !m.description.trim() || !m.amount || parseFloat(m.amount) <= 0)) {
       toast.error('All milestones must have a description and valid amount');
       return;
     }
 
     setSubmitting(true);
-    // Simulate contract call
-    await new Promise(r => setTimeout(r, 2000));
-    toast.success('Escrow created successfully!', {
-      description: 'Contract deployed. Tx: 7b2e...f1a3',
-    });
-    setSubmitting(false);
-    navigate('/dashboard');
+    try {
+      const result = await api.createEscrow({
+        clientWallet: walletAddress,
+        freelancerWallet,
+        milestones,
+        reviewWindowDays: reviewDays,
+      });
+
+      toast.success('Escrow created successfully!', {
+        description: `Tx: ${result.txHash.slice(0, 8)}...`,
+        action: {
+          label: 'View',
+          onClick: () => window.open(result.explorerUrl, '_blank'),
+        },
+      });
+
+      // Auto-deposit funds
+      try {
+        const depositResult = await api.depositFunds(result.escrowId, walletAddress);
+        toast.success('Funds deposited!', {
+          description: `Tx: ${depositResult.txHash.slice(0, 8)}...`,
+        });
+      } catch (depositError: any) {
+        toast.error('Deposit failed', { description: depositError.message });
+      }
+
+      navigate('/dashboard/client');
+    } catch (error: any) {
+      toast.error('Failed to create escrow', { description: error.message });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -88,12 +131,17 @@ const CreateEscrow = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Deadline</Label>
+                  <Label>Review Window (Days)</Label>
                   <Input
-                    type="datetime-local"
-                    value={deadline}
-                    onChange={e => setDeadline(e.target.value)}
+                    type="number"
+                    value={reviewWindowDays}
+                    onChange={e => setReviewWindowDays(e.target.value)}
+                    min="1"
+                    max="30"
                   />
+                  <p className="text-xs text-muted-foreground">
+                    Time allowed for you to review each milestone submission
+                  </p>
                 </div>
 
                 <div className="space-y-3">
