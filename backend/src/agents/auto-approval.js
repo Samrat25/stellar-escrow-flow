@@ -1,5 +1,5 @@
 import cron from 'node-cron';
-import { supabase } from '../config/supabase.js';
+import prisma from '../config/prisma.js';
 import ContractService from '../services/contract.js';
 import dotenv from 'dotenv';
 
@@ -16,19 +16,17 @@ async function checkAndAutoApprove() {
 
   try {
     // Find submitted milestones with expired review deadlines
-    const { data: expiredMilestones, error } = await supabase
-      .from('milestones')
-      .select(`
-        *,
-        escrows (*)
-      `)
-      .eq('status', 'SUBMITTED')
-      .lt('review_deadline', new Date().toISOString());
-
-    if (error) {
-      console.error('Error fetching expired milestones:', error);
-      return;
-    }
+    const expiredMilestones = await prisma.milestone.findMany({
+      where: {
+        status: 'SUBMITTED',
+        reviewDeadline: {
+          lt: new Date()
+        }
+      },
+      include: {
+        escrow: true
+      }
+    });
 
     if (!expiredMilestones || expiredMilestones.length === 0) {
       console.log('No milestones to auto-approve');
@@ -40,15 +38,15 @@ async function checkAndAutoApprove() {
     // Process each expired milestone
     for (const milestone of expiredMilestones) {
       try {
-        const escrow = milestone.escrows;
+        const escrow = milestone.escrow;
         
-        console.log(`Auto-approving milestone ${milestone.milestone_index} for escrow ${escrow.id}`);
+        console.log(`Auto-approving milestone ${milestone.milestoneIndex} for escrow ${escrow.id}`);
 
         // Call contract to auto-approve
-        const contractService = new ContractService(escrow.contract_id);
+        const contractService = new ContractService(escrow.contractId);
         const result = await contractService.autoApproveMilestone(
           escrow.id,
-          milestone.milestone_index
+          milestone.milestoneIndex
         );
 
         if (!result.success) {
@@ -57,41 +55,48 @@ async function checkAndAutoApprove() {
         }
 
         // Update milestone status
-        const { error: updateError } = await supabase
-          .from('milestones')
-          .update({
+        await prisma.milestone.update({
+          where: { id: milestone.id },
+          data: {
             status: 'APPROVED',
-            approved_at: new Date().toISOString(),
-            auto_approved: true,
-            approval_tx_hash: result.txHash
-          })
-          .eq('id', milestone.id);
+            approvedAt: new Date(),
+            autoApproved: true,
+            approvalTxHash: result.txHash
+          }
+        });
 
-        if (updateError) {
-          console.error(`Failed to update milestone ${milestone.id}:`, updateError);
-          continue;
-        }
+        // Log transaction
+        await prisma.transactionLog.create({
+          data: {
+            escrowId: escrow.id,
+            milestoneId: milestone.id,
+            txHash: result.txHash,
+            txType: 'AUTO_APPROVE',
+            walletAddress: escrow.freelancerWallet,
+            amount: milestone.amount,
+            metadata: JSON.stringify({ autoApproved: true })
+          }
+        });
 
-        console.log(`✅ Auto-approved milestone ${milestone.milestone_index}`);
+        console.log(`✅ Auto-approved milestone ${milestone.milestoneIndex}`);
         console.log(`   Tx: ${result.txHash}`);
         console.log(`   Explorer: ${result.explorerUrl}`);
 
         // Check if all milestones are now approved
-        const { data: allMilestones } = await supabase
-          .from('milestones')
-          .select('status')
-          .eq('escrow_id', escrow.id);
+        const allMilestones = await prisma.milestone.findMany({
+          where: { escrowId: escrow.id }
+        });
 
         const allApproved = allMilestones.every(m => m.status === 'APPROVED');
 
         if (allApproved) {
-          await supabase
-            .from('escrows')
-            .update({ 
+          await prisma.escrow.update({
+            where: { id: escrow.id },
+            data: {
               status: 'COMPLETED',
-              completed_at: new Date().toISOString()
-            })
-            .eq('id', escrow.id);
+              completedAt: new Date()
+            }
+          });
 
           console.log(`🎉 Escrow ${escrow.id} completed!`);
         }

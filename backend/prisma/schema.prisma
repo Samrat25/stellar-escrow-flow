@@ -1,0 +1,76 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id                    String            @id @default(uuid())
+  walletAddress         String            @unique
+  role                  String            @default("BOTH")
+  createdAt             DateTime          @default(now())
+  clientEscrows         Escrow[]          @relation("ClientEscrows")
+  freelancerEscrows     Escrow[]          @relation("FreelancerEscrows")
+  transactionLogs       TransactionLog[]
+}
+
+model Escrow {
+  id                    String            @id @default(uuid())
+  contractId            String            @unique
+  clientWallet          String
+  freelancerWallet      String
+  totalAmount           Float
+  status                String            @default("CREATED")
+  reviewWindowDays      Int               @default(3)
+  creationTxHash        String?
+  depositTxHash         String?
+  fundedAt              DateTime?
+  completedAt           DateTime?
+  createdAt             DateTime          @default(now())
+  client                User              @relation("ClientEscrows", fields: [clientWallet], references: [walletAddress])
+  freelancer            User              @relation("FreelancerEscrows", fields: [freelancerWallet], references: [walletAddress])
+  milestones            Milestone[]
+  transactionLogs       TransactionLog[]
+}
+
+model Milestone {
+  id                    String            @id @default(uuid())
+  escrowId              String
+  milestoneIndex        Int
+  description           String
+  amount                Float
+  status                String            @default("PENDING")
+  proofUrl              String?
+  submittedAt           DateTime?
+  approvedAt            DateTime?
+  rejectedAt            DateTime?
+  reviewDeadline        DateTime?
+  autoApproved          Int               @default(0)
+  submissionTxHash      String?
+  approvalTxHash        String?
+  rejectionTxHash       String?
+  rejectionReason       String?
+  createdAt             DateTime          @default(now())
+  escrow                Escrow            @relation(fields: [escrowId], references: [id], onDelete: Cascade)
+  transactionLogs       TransactionLog[]
+
+  @@unique([escrowId, milestoneIndex])
+}
+
+model TransactionLog {
+  id                    String            @id @default(uuid())
+  escrowId              String?
+  milestoneId           String?
+  txHash                String
+  txType                String
+  walletAddress         String
+  amount                Float?
+  metadata              String?
+  createdAt             DateTime          @default(now())
+  escrow                Escrow?           @relation(fields: [escrowId], references: [id], onDelete: Cascade)
+  milestone             Milestone?        @relation(fields: [milestoneId], references: [id], onDelete: Cascade)
+  user                  User              @relation(fields: [walletAddress], references: [walletAddress])
+}

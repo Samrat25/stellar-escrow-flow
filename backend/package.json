@@ -1,18 +1,25 @@
 {
-  "name": "trustpay-backend",
+  "name": "stellar-escrow-backend",
   "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "node --watch src/server.js",
     "start": "node src/server.js",
-    "agent": "node src/agents/auto-approval.js"
+    "agent": "node src/agents/auto-approval.js",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:deploy": "prisma migrate deploy",
+    "prisma:studio": "prisma studio"
   },
   "dependencies": {
+    "@prisma/client": "^5.22.0",
     "@stellar/stellar-sdk": "^12.3.0",
-    "@supabase/supabase-js": "^2.45.0",
     "express": "^4.21.2",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "node-cron": "^3.0.3"
+  },
+  "devDependencies": {
+    "prisma": "^5.22.0"
   }
 }

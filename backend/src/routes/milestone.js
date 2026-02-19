@@ -1,5 +1,5 @@
 import express from 'express';
-import { supabase } from '../config/supabase.js';
+import prisma from '../config/prisma.js';
 import ContractService from '../services/contract.js';
 
 const router = express.Router();
@@ -12,21 +12,19 @@ router.post('/submit', async (req, res) => {
   try {
     const { milestoneId, freelancerWallet, proofUrl } = req.body;
 
-    // Get milestone and escrow
-    const { data: milestone, error: milestoneError } = await supabase
-      .from('milestones')
-      .select('*, escrows(*)')
-      .eq('id', milestoneId)
-      .single();
+    const milestone = await prisma.milestone.findUnique({
+      where: { id: milestoneId },
+      include: { escrow: true }
+    });
 
-    if (milestoneError || !milestone) {
+    if (!milestone) {
       return res.status(404).json({ error: 'Milestone not found' });
     }
 
-    const escrow = milestone.escrows;
+    const escrow = milestone.escrow;
 
     // Validation
-    if (escrow.freelancer_wallet !== freelancerWallet) {
+    if (escrow.freelancerWallet !== freelancerWallet) {
       return res.status(403).json({ error: 'Only assigned freelancer can submit' });
     }
 
@@ -39,13 +37,13 @@ router.post('/submit', async (req, res) => {
     }
 
     // Check if previous milestone is approved (sequential)
-    if (milestone.milestone_index > 0) {
-      const { data: prevMilestone } = await supabase
-        .from('milestones')
-        .select('status')
-        .eq('escrow_id', escrow.id)
-        .eq('milestone_index', milestone.milestone_index - 1)
-        .single();
+    if (milestone.milestoneIndex > 0) {
+      const prevMilestone = await prisma.milestone.findFirst({
+        where: {
+          escrowId: escrow.id,
+          milestoneIndex: milestone.milestoneIndex - 1
+        }
+      });
 
       if (prevMilestone && prevMilestone.status !== 'APPROVED') {
         return res.status(400).json({ error: 'Previous milestone must be approved first' });
@@ -53,10 +51,10 @@ router.post('/submit', async (req, res) => {
     }
 
     // Call contract
-    const contractService = new ContractService(escrow.contract_id);
+    const contractService = new ContractService(escrow.contractId);
     const result = await contractService.submitMilestone(
       escrow.id,
-      milestone.milestone_index,
+      milestone.milestoneIndex,
       proofUrl
     );
 
@@ -66,21 +64,31 @@ router.post('/submit', async (req, res) => {
 
     // Calculate review deadline
     const reviewDeadline = new Date();
-    reviewDeadline.setDate(reviewDeadline.getDate() + escrow.review_window_days);
+    reviewDeadline.setDate(reviewDeadline.getDate() + escrow.reviewWindowDays);
 
     // Update milestone
-    const { error: updateError } = await supabase
-      .from('milestones')
-      .update({
+    await prisma.milestone.update({
+      where: { id: milestoneId },
+      data: {
         status: 'SUBMITTED',
-        proof_url: proofUrl,
-        submitted_at: new Date().toISOString(),
-        review_deadline: reviewDeadline.toISOString(),
-        submission_tx_hash: result.txHash
-      })
-      .eq('id', milestoneId);
+        proofUrl,
+        submittedAt: new Date(),
+        reviewDeadline,
+        submissionTxHash: result.txHash
+      }
+    });
 
-    if (updateError) throw updateError;
+    // Log transaction
+    await prisma.transactionLog.create({
+      data: {
+        escrowId: escrow.id,
+        milestoneId,
+        txHash: result.txHash,
+        txType: 'SUBMIT',
+        walletAddress: freelancerWallet,
+        amount: milestone.amount
+      }
+    });
 
     res.json({
       success: true,
@@ -102,21 +110,19 @@ router.post('/approve', async (req, res) => {
   try {
     const { milestoneId, clientWallet } = req.body;
 
-    // Get milestone and escrow
-    const { data: milestone, error: milestoneError } = await supabase
-      .from('milestones')
-      .select('*, escrows(*)')
-      .eq('id', milestoneId)
-      .single();
+    const milestone = await prisma.milestone.findUnique({
+      where: { id: milestoneId },
+      include: { escrow: true }
+    });
 
-    if (milestoneError || !milestone) {
+    if (!milestone) {
       return res.status(404).json({ error: 'Milestone not found' });
     }
 
-    const escrow = milestone.escrows;
+    const escrow = milestone.escrow;
 
     // Validation
-    if (escrow.client_wallet !== clientWallet) {
+    if (escrow.clientWallet !== clientWallet) {
       return res.status(403).json({ error: 'Only client can approve' });
     }
 
@@ -125,10 +131,10 @@ router.post('/approve', async (req, res) => {
     }
 
     // Call contract to release funds
-    const contractService = new ContractService(escrow.contract_id);
+    const contractService = new ContractService(escrow.contractId);
     const result = await contractService.approveMilestone(
       escrow.id,
-      milestone.milestone_index
+      milestone.milestoneIndex
     );
 
     if (!result.success) {
@@ -136,33 +142,42 @@ router.post('/approve', async (req, res) => {
     }
 
     // Update milestone
-    const { error: updateError } = await supabase
-      .from('milestones')
-      .update({
+    await prisma.milestone.update({
+      where: { id: milestoneId },
+      data: {
         status: 'APPROVED',
-        approved_at: new Date().toISOString(),
-        approval_tx_hash: result.txHash
-      })
-      .eq('id', milestoneId);
+        approvedAt: new Date(),
+        approvalTxHash: result.txHash
+      }
+    });
 
-    if (updateError) throw updateError;
+    // Log transaction
+    await prisma.transactionLog.create({
+      data: {
+        escrowId: escrow.id,
+        milestoneId,
+        txHash: result.txHash,
+        txType: 'APPROVE',
+        walletAddress: clientWallet,
+        amount: milestone.amount
+      }
+    });
 
     // Check if all milestones approved
-    const { data: allMilestones } = await supabase
-      .from('milestones')
-      .select('status')
-      .eq('escrow_id', escrow.id);
+    const allMilestones = await prisma.milestone.findMany({
+      where: { escrowId: escrow.id }
+    });
 
     const allApproved = allMilestones.every(m => m.status === 'APPROVED');
 
     if (allApproved) {
-      await supabase
-        .from('escrows')
-        .update({ 
+      await prisma.escrow.update({
+        where: { id: escrow.id },
+        data: {
           status: 'COMPLETED',
-          completed_at: new Date().toISOString()
-        })
-        .eq('id', escrow.id);
+          completedAt: new Date()
+        }
+      });
     }
 
     res.json({
@@ -185,21 +200,19 @@ router.post('/reject', async (req, res) => {
   try {
     const { milestoneId, clientWallet, reason } = req.body;
 
-    // Get milestone and escrow
-    const { data: milestone, error: milestoneError } = await supabase
-      .from('milestones')
-      .select('*, escrows(*)')
-      .eq('id', milestoneId)
-      .single();
+    const milestone = await prisma.milestone.findUnique({
+      where: { id: milestoneId },
+      include: { escrow: true }
+    });
 
-    if (milestoneError || !milestone) {
+    if (!milestone) {
       return res.status(404).json({ error: 'Milestone not found' });
     }
 
-    const escrow = milestone.escrows;
+    const escrow = milestone.escrow;
 
     // Validation
-    if (escrow.client_wallet !== clientWallet) {
+    if (escrow.clientWallet !== clientWallet) {
       return res.status(403).json({ error: 'Only client can reject' });
     }
 
@@ -208,10 +221,10 @@ router.post('/reject', async (req, res) => {
     }
 
     // Call contract
-    const contractService = new ContractService(escrow.contract_id);
+    const contractService = new ContractService(escrow.contractId);
     const result = await contractService.rejectMilestone(
       escrow.id,
-      milestone.milestone_index,
+      milestone.milestoneIndex,
       reason
     );
 
@@ -220,17 +233,27 @@ router.post('/reject', async (req, res) => {
     }
 
     // Update milestone
-    const { error: updateError } = await supabase
-      .from('milestones')
-      .update({
+    await prisma.milestone.update({
+      where: { id: milestoneId },
+      data: {
         status: 'REJECTED',
-        rejection_reason: reason,
-        rejected_at: new Date().toISOString(),
-        rejection_tx_hash: result.txHash
-      })
-      .eq('id', milestoneId);
+        rejectionReason: reason,
+        rejectedAt: new Date(),
+        rejectionTxHash: result.txHash
+      }
+    });
 
-    if (updateError) throw updateError;
+    // Log transaction
+    await prisma.transactionLog.create({
+      data: {
+        escrowId: escrow.id,
+        milestoneId,
+        txHash: result.txHash,
+        txType: 'REJECT',
+        walletAddress: clientWallet,
+        metadata: JSON.stringify({ reason })
+      }
+    });
 
     res.json({
       success: true,

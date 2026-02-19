@@ -1,5 +1,5 @@
 import express from 'express';
-import { supabase } from '../config/supabase.js';
+import prisma from '../config/prisma.js';
 import ContractService from '../services/contract.js';
 import { isValidStellarAddress } from '../config/stellar.js';
 
@@ -18,6 +18,10 @@ router.post('/create', async (req, res) => {
       return res.status(400).json({ error: 'Invalid wallet address' });
     }
 
+    if (clientWallet === freelancerWallet) {
+      return res.status(400).json({ error: 'Client and freelancer must be different' });
+    }
+
     if (!milestones || milestones.length === 0) {
       return res.status(400).json({ error: 'At least one milestone required' });
     }
@@ -27,6 +31,19 @@ router.post('/create', async (req, res) => {
     }
 
     const totalAmount = milestones.reduce((sum, m) => sum + parseFloat(m.amount), 0);
+
+    // Ensure users exist
+    await prisma.user.upsert({
+      where: { walletAddress: clientWallet },
+      update: {},
+      create: { walletAddress: clientWallet, role: 'CLIENT' }
+    });
+
+    await prisma.user.upsert({
+      where: { walletAddress: freelancerWallet },
+      update: {},
+      create: { walletAddress: freelancerWallet, role: 'FREELANCER' }
+    });
 
     // Deploy contract
     const contractService = new ContractService();
@@ -41,37 +58,40 @@ router.post('/create', async (req, res) => {
       return res.status(500).json({ error: 'Contract deployment failed' });
     }
 
-    // Store in database
-    const { data: escrow, error: escrowError } = await supabase
-      .from('escrows')
-      .insert({
-        contract_id: contractResult.contractId,
-        client_wallet: clientWallet,
-        freelancer_wallet: freelancerWallet,
-        total_amount: totalAmount,
+    // Create escrow with milestones in transaction
+    const escrow = await prisma.escrow.create({
+      data: {
+        contractId: contractResult.contractId,
+        clientWallet,
+        freelancerWallet,
+        totalAmount,
         status: 'CREATED',
-        review_window_days: reviewWindowDays,
-        creation_tx_hash: contractResult.txHash
-      })
-      .select()
-      .single();
+        reviewWindowDays,
+        creationTxHash: contractResult.txHash,
+        milestones: {
+          create: milestones.map((m, index) => ({
+            milestoneIndex: index,
+            description: m.description,
+            amount: parseFloat(m.amount),
+            status: 'PENDING'
+          }))
+        }
+      },
+      include: {
+        milestones: true
+      }
+    });
 
-    if (escrowError) throw escrowError;
-
-    // Store milestones
-    const milestonesData = milestones.map((m, index) => ({
-      escrow_id: escrow.id,
-      milestone_index: index,
-      description: m.description,
-      amount: parseFloat(m.amount),
-      status: 'PENDING'
-    }));
-
-    const { error: milestonesError } = await supabase
-      .from('milestones')
-      .insert(milestonesData);
-
-    if (milestonesError) throw milestonesError;
+    // Log transaction
+    await prisma.transactionLog.create({
+      data: {
+        escrowId: escrow.id,
+        txHash: contractResult.txHash,
+        txType: 'CREATE',
+        walletAddress: clientWallet,
+        amount: totalAmount
+      }
+    });
 
     res.json({
       success: true,
@@ -94,18 +114,15 @@ router.post('/deposit', async (req, res) => {
   try {
     const { escrowId, clientWallet } = req.body;
 
-    // Get escrow
-    const { data: escrow, error: fetchError } = await supabase
-      .from('escrows')
-      .select('*')
-      .eq('id', escrowId)
-      .single();
+    const escrow = await prisma.escrow.findUnique({
+      where: { id: escrowId }
+    });
 
-    if (fetchError || !escrow) {
+    if (!escrow) {
       return res.status(404).json({ error: 'Escrow not found' });
     }
 
-    if (escrow.client_wallet !== clientWallet) {
+    if (escrow.clientWallet !== clientWallet) {
       return res.status(403).json({ error: 'Only client can deposit' });
     }
 
@@ -114,24 +131,33 @@ router.post('/deposit', async (req, res) => {
     }
 
     // Call contract
-    const contractService = new ContractService(escrow.contract_id);
-    const result = await contractService.depositFunds(clientWallet, escrow.total_amount);
+    const contractService = new ContractService(escrow.contractId);
+    const result = await contractService.depositFunds(clientWallet, escrow.totalAmount);
 
     if (!result.success) {
       return res.status(500).json({ error: 'Deposit failed' });
     }
 
-    // Update status
-    const { error: updateError } = await supabase
-      .from('escrows')
-      .update({ 
+    // Update escrow
+    await prisma.escrow.update({
+      where: { id: escrowId },
+      data: {
         status: 'FUNDED',
-        funded_at: new Date().toISOString(),
-        deposit_tx_hash: result.txHash
-      })
-      .eq('id', escrowId);
+        fundedAt: new Date(),
+        depositTxHash: result.txHash
+      }
+    });
 
-    if (updateError) throw updateError;
+    // Log transaction
+    await prisma.transactionLog.create({
+      data: {
+        escrowId,
+        txHash: result.txHash,
+        txType: 'DEPOSIT',
+        walletAddress: clientWallet,
+        amount: escrow.totalAmount
+      }
+    });
 
     res.json({
       success: true,
@@ -152,28 +178,20 @@ router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
 
-    const { data: escrow, error: escrowError } = await supabase
-      .from('escrows')
-      .select('*')
-      .eq('id', id)
-      .single();
+    const escrow = await prisma.escrow.findUnique({
+      where: { id },
+      include: {
+        milestones: {
+          orderBy: { milestoneIndex: 'asc' }
+        }
+      }
+    });
 
-    if (escrowError || !escrow) {
+    if (!escrow) {
       return res.status(404).json({ error: 'Escrow not found' });
     }
 
-    const { data: milestones, error: milestonesError } = await supabase
-      .from('milestones')
-      .select('*')
-      .eq('escrow_id', id)
-      .order('milestone_index');
-
-    if (milestonesError) throw milestonesError;
-
-    res.json({
-      ...escrow,
-      milestones
-    });
+    res.json(escrow);
   } catch (error) {
     console.error('Get escrow error:', error);
     res.status(500).json({ error: error.message });
@@ -192,16 +210,20 @@ router.get('/wallet/:address', async (req, res) => {
       return res.status(400).json({ error: 'Invalid wallet address' });
     }
 
-    const { data: escrows, error } = await supabase
-      .from('escrows')
-      .select(`
-        *,
-        milestones (*)
-      `)
-      .or(`client_wallet.eq.${address},freelancer_wallet.eq.${address}`)
-      .order('created_at', { ascending: false });
-
-    if (error) throw error;
+    const escrows = await prisma.escrow.findMany({
+      where: {
+        OR: [
+          { clientWallet: address },
+          { freelancerWallet: address }
+        ]
+      },
+      include: {
+        milestones: {
+          orderBy: { milestoneIndex: 'asc' }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
 
     res.json(escrows);
   } catch (error) {
