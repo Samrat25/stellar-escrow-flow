@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Shield, Menu, X, User, RefreshCw } from 'lucide-react';
+import { Shield, Menu, X, User, RefreshCw, Wallet } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { truncateAddress } from '@/lib/stellar';
+import { truncateAddress, getWalletBalance, formatXLM } from '@/lib/stellar';
 import { useStellarWallet } from '@/contexts/WalletContext';
 import { useMode } from '@/contexts/ModeContext';
 import {
@@ -23,8 +23,25 @@ const navItems = [
 const Navbar = () => {
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [balance, setBalance] = useState<number | null>(null);
   const { address, connect, disconnect } = useStellarWallet();
   const { mode, toggleMode } = useMode();
+
+  useEffect(() => {
+    if (address) {
+      loadBalance();
+      const interval = setInterval(loadBalance, 10000); // Refresh every 10s
+      return () => clearInterval(interval);
+    } else {
+      setBalance(null);
+    }
+  }, [address]);
+
+  const loadBalance = async () => {
+    if (!address) return;
+    const bal = await getWalletBalance(address);
+    setBalance(bal);
+  };
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 glass border-b border-border">
@@ -52,6 +69,13 @@ const Navbar = () => {
         <div className="flex items-center gap-3">
           {address ? (
             <>
+              {balance !== null && (
+                <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-primary/10 rounded-md">
+                  <Wallet className="h-4 w-4 text-primary" />
+                  <span className="text-sm font-medium">{formatXLM(balance)}</span>
+                </div>
+              )}
+              
               <Button
                 variant="outline"
                 size="sm"
@@ -79,6 +103,11 @@ const Navbar = () => {
                       <span className="text-[10px] text-muted-foreground mt-1">
                         Mode: {mode}
                       </span>
+                      {balance !== null && (
+                        <span className="text-xs font-medium text-primary mt-1">
+                          Balance: {formatXLM(balance)}
+                        </span>
+                      )}
                     </div>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />

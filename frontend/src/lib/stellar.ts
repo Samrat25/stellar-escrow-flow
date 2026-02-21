@@ -41,6 +41,20 @@ export const formatXLM = (amount: number): string => {
   return `${amount.toLocaleString()} XLM`;
 };
 
+export const getWalletBalance = async (address: string): Promise<number> => {
+  try {
+    const response = await fetch(`${TESTNET_HORIZON}/accounts/${address}`);
+    if (!response.ok) return 0;
+    
+    const account = await response.json();
+    const xlmBalance = account.balances.find((b: any) => b.asset_type === 'native');
+    return xlmBalance ? parseFloat(xlmBalance.balance) : 0;
+  } catch (error) {
+    console.error('Error fetching balance:', error);
+    return 0;
+  }
+};
+
 export const getDeadlineRemaining = (deadline: string): { days: number; hours: number; minutes: number; expired: boolean } => {
   const now = new Date().getTime();
   const end = new Date(deadline).getTime();
