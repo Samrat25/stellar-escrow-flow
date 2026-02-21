@@ -1,0 +1,35 @@
+services:
+  - type: web
+    name: stellar-escrow-backend
+    env: node
+    plan: starter
+    buildCommand: npm install && npx prisma migrate deploy
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: '3001'
+      - key: STELLAR_NETWORK
+        value: testnet
+      - key: STELLAR_HORIZON_URL
+        value: https://horizon-testnet.stellar.org
+      - key: DATABASE_URL
+        fromDatabase:
+          name: stellar-escrow-db
+          property: connectionString
+      - key: CONTRACT_ID
+        sync: false
+      - key: USE_REAL_CONTRACT
+        value: 'true'
+      - key: ENABLE_AUTO_APPROVAL_AGENT
+        value: 'true'
+      - key: ENABLE_SYNC_AGENT
+        value: 'true'
+      - key: ENABLE_FEEDBACK_AGENT
+        value: 'true'
+
+databases:
+  - name: stellar-escrow-db
+    plan: starter
+    postgreSQL Version: 14

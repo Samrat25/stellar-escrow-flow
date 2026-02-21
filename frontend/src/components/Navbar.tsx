@@ -1,27 +1,30 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { Shield, Menu, X } from 'lucide-react';
+import { Shield, Menu, X, User, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { truncateAddress } from '@/lib/stellar';
-
-interface NavbarProps {
-  walletAddress: string | null;
-  onConnect: () => void;
-  onDisconnect: () => void;
-  connecting: boolean;
-}
+import { useStellarWallet } from '@/contexts/WalletContext';
+import { useMode } from '@/contexts/ModeContext';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Badge } from '@/components/ui/badge';
 
 const navItems = [
-  { label: 'Client', path: '/dashboard/client' },
-  { label: 'Freelancer', path: '/dashboard/freelancer' },
-  { label: 'Create Escrow', path: '/create' },
-  { label: 'Feedback', path: '/feedback' },
+  { label: 'Dashboard', path: '/dashboard' },
+  { label: 'Create Milestone', path: '/create-milestone' },
 ];
 
-const Navbar = ({ walletAddress, onConnect, onDisconnect, connecting }: NavbarProps) => {
+const Navbar = () => {
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { address, connect, disconnect } = useStellarWallet();
+  const { mode, toggleMode } = useMode();
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 glass border-b border-border">
@@ -47,22 +50,51 @@ const Navbar = ({ walletAddress, onConnect, onDisconnect, connecting }: NavbarPr
         </div>
 
         <div className="flex items-center gap-3">
-          {walletAddress ? (
-            <div className="flex items-center gap-2">
-              <div className="glow-border rounded-lg px-3 py-1.5 font-mono text-sm text-primary">
-                {truncateAddress(walletAddress)}
-              </div>
-              <Button onClick={onDisconnect} variant="ghost" size="sm">
-                Disconnect
+          {address ? (
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={toggleMode}
+                className="gap-2"
+              >
+                <RefreshCw className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">{mode === 'BUYING' ? 'Switch to Selling' : 'Switch to Buying'}</span>
+                <Badge variant={mode === 'BUYING' ? 'default' : 'secondary'} className="text-[10px]">
+                  {mode}
+                </Badge>
               </Button>
-            </div>
+              
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="gap-2">
+                    <User className="h-4 w-4" />
+                    <span className="font-mono text-xs hidden sm:inline">{truncateAddress(address)}</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuLabel>
+                    <div className="flex flex-col">
+                      <span className="text-xs font-mono">{truncateAddress(address)}</span>
+                      <span className="text-[10px] text-muted-foreground mt-1">
+                        Mode: {mode}
+                      </span>
+                    </div>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem asChild>
+                    <Link to="/dashboard">Dashboard</Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={disconnect}>
+                    Disconnect Wallet
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </>
           ) : (
-            <Button onClick={onConnect} disabled={connecting} size="sm">
-              {connecting ? (
-                <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }}>⟳</motion.div>
-              ) : (
-                'Connect Wallet'
-              )}
+            <Button onClick={connect} size="sm">
+              Connect Wallet
             </Button>
           )}
 
@@ -74,11 +106,7 @@ const Navbar = ({ walletAddress, onConnect, onDisconnect, connecting }: NavbarPr
 
       {/* Mobile menu */}
       {mobileOpen && (
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="md:hidden glass border-b border-border px-4 pb-4"
-        >
+        <div className="md:hidden glass border-b border-border px-4 pb-4">
           {navItems.map((item) => (
             <Link key={item.path} to={item.path} onClick={() => setMobileOpen(false)}>
               <Button variant="ghost" className="w-full justify-start text-sm my-1">
@@ -86,7 +114,7 @@ const Navbar = ({ walletAddress, onConnect, onDisconnect, connecting }: NavbarPr
               </Button>
             </Link>
           ))}
-        </motion.div>
+        </div>
       )}
     </nav>
   );

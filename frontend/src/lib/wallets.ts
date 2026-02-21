@@ -1,3 +1,9 @@
+import { 
+  isConnected, 
+  requestAccess, 
+  signTransaction as freighterSignTransaction,
+} from '@stellar/freighter-api';
+
 export type WalletType = 'freighter' | 'albedo' | 'xbull';
 
 export interface WalletInfo {
@@ -12,12 +18,13 @@ export const checkWalletInstallationSync = (): Record<WalletType, boolean> => {
     return { freighter: false, albedo: false, xbull: false };
   }
 
-  const hasFreighter = !!(window as any).freighter;
+  // For Freighter, we'll assume it might be installed
+  // The actual check happens async when connecting
   const hasAlbedo = true;
   const hasXBull = !!(window as any).xBullSDK || !!(window as any).xbull;
 
   return {
-    freighter: hasFreighter,
+    freighter: true, // Always show Freighter option, check on connect
     albedo: hasAlbedo,
     xbull: hasXBull,
   };
@@ -49,17 +56,46 @@ export const getAvailableWallets = (): WalletInfo[] => {
 };
 
 const connectFreighter = async (): Promise<string> => {
-  if (!(window as any).freighter) {
-    throw new Error('Freighter not installed. Install from https://www.freighter.app/ then refresh page.');
-  }
+  try {
+    console.log('Attempting to connect to Freighter...');
+    
+    // Check if Freighter is installed and connected
+    const connectionCheck = await isConnected();
+    console.log('Freighter connection check:', connectionCheck);
+    
+    if (connectionCheck.error) {
+      throw new Error(connectionCheck.error);
+    }
+    
+    if (!connectionCheck.isConnected) {
+      throw new Error('Freighter is not installed. Please install the Freighter browser extension from https://www.freighter.app/ and refresh this page.');
+    }
 
-  const publicKey = await (window as any).freighter.getPublicKey();
-  
-  if (!publicKey) {
-    throw new Error('Connection cancelled or failed');
-  }
+    // Request access and get public key
+    console.log('Requesting access to Freighter...');
+    const accessResult = await requestAccess();
+    console.log('Freighter access result:', accessResult);
+    
+    if (accessResult.error) {
+      throw new Error(accessResult.error);
+    }
 
-  return publicKey;
+    if (!accessResult.address || typeof accessResult.address !== 'string') {
+      throw new Error('Failed to get wallet address from Freighter');
+    }
+
+    console.log('Successfully connected to Freighter:', accessResult.address);
+    return accessResult.address;
+  } catch (error: any) {
+    console.error('Freighter connection error:', error);
+    
+    // Provide helpful error messages
+    if (error.message?.includes('User declined access')) {
+      throw new Error('You declined access to Freighter. Please try again and approve the connection.');
+    }
+    
+    throw new Error(error.message || 'Failed to connect to Freighter wallet. Make sure the extension is installed and enabled.');
+  }
 };
 
 const connectAlbedo = async (): Promise<string> => {
@@ -132,14 +168,23 @@ export const signTransaction = async (
 ): Promise<string> => {
   switch (walletType) {
     case 'freighter': {
-      const freighter = (window as any).freighter;
-      const result = await freighter.signTransaction(xdr, {
-        network: network === 'testnet' ? 'TESTNET' : 'PUBLIC',
-        networkPassphrase: network === 'testnet' 
-          ? 'Test SDF Network ; September 2015'
-          : 'Public Global Stellar Network ; September 2015',
-      });
-      return result;
+      try {
+        const result = await freighterSignTransaction(xdr, {
+          network: network === 'testnet' ? 'TESTNET' : 'PUBLIC',
+          networkPassphrase: network === 'testnet' 
+            ? 'Test SDF Network ; September 2015'
+            : 'Public Global Stellar Network ; September 2015',
+        });
+        
+        if (result.error) {
+          throw new Error(result.error);
+        }
+        
+        return result.signedTxXdr;
+      } catch (error: any) {
+        console.error('Freighter signing error:', error);
+        throw new Error(error.message || 'Failed to sign transaction');
+      }
     }
     
     case 'albedo': {

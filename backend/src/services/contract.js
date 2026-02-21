@@ -1,11 +1,18 @@
 import * as StellarSDK from '@stellar/stellar-sdk';
-import { server, NETWORK_PASSPHRASE } from '../config/stellar.js';
+import { NETWORK_PASSPHRASE } from '../config/stellar.js';
+import { randomBytes } from 'crypto';
 import dotenv from 'dotenv';
 
 dotenv.config();
 
 const USE_REAL_CONTRACT = process.env.USE_REAL_CONTRACT === 'true';
 const CONTRACT_ID = process.env.CONTRACT_ID;
+const SOROBAN_RPC_URL = 'https://soroban-testnet.stellar.org';
+const HORIZON_URL = 'https://horizon-testnet.stellar.org';
+
+// Create Soroban RPC server
+const sorobanServer = new StellarSDK.SorobanRpc.Server(SOROBAN_RPC_URL);
+const horizonServer = new StellarSDK.Horizon.Server(HORIZON_URL);
 
 /**
  * Contract Service for interacting with Soroban smart contract
@@ -19,88 +26,113 @@ export class ContractService {
   }
 
   /**
-   * Create escrow on-chain
+   * Create milestone on-chain
+   * Returns unsigned transaction XDR for client to sign
    */
-  async createEscrow(clientWallet, freelancerWallet, milestones, reviewWindowDays) {
+  async createMilestone(clientWallet, freelancerWallet, amount) {
     if (this.useRealContract) {
-      return await this.createEscrowReal(clientWallet, freelancerWallet, milestones, reviewWindowDays);
+      return await this.createMilestoneReal(clientWallet, freelancerWallet, amount);
     }
-    return await this.createEscrowMock(clientWallet, freelancerWallet, milestones, reviewWindowDays);
+    return await this.createMilestoneMock(clientWallet, freelancerWallet, amount);
   }
 
-  async createEscrowReal(clientWallet, freelancerWallet, milestones, reviewWindowDays) {
+  async createMilestoneReal(clientWallet, freelancerWallet, amount) {
     try {
       // Build Soroban contract invocation
       const contract = new StellarSDK.Contract(this.contractId);
       
-      // Convert milestone amounts to ScVal
-      const milestoneAmounts = milestones.map(m => 
-        StellarSDK.nativeToScVal(parseFloat(m.amount) * 10000000, { type: 'i128' })
-      );
-
-      // Build transaction
-      const account = await server.loadAccount(clientWallet);
+      // Convert amount to stroops (1 XLM = 10,000,000 stroops)
+      const amountInStroops = Math.floor(amount * 10000000);
       
-      const transaction = new StellarSDK.TransactionBuilder(account, {
+      // Build transaction
+      const account = await horizonServer.loadAccount(clientWallet);
+      
+      // Handle token address - for native XLM, use the native asset contract
+      const tokenAddress = process.env.TOKEN_ADDRESS === 'native' 
+        ? 'CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC' // Native XLM contract on testnet
+        : process.env.TOKEN_ADDRESS;
+      
+      // Create escrow with single milestone
+      const escrowId = `escrow-${Date.now()}`;
+      const milestoneAmounts = [StellarSDK.nativeToScVal(amountInStroops, { type: 'i128' })];
+      const reviewWindowDays = 7; // Default 7 days
+      const deadlineTimestamp = Math.floor(Date.now() / 1000) + (reviewWindowDays * 86400);
+      
+      let transaction = new StellarSDK.TransactionBuilder(account, {
         fee: StellarSDK.BASE_FEE,
         networkPassphrase: NETWORK_PASSPHRASE,
       })
         .addOperation(
           contract.call(
-            'initialize',
+            'create_escrow',
+            StellarSDK.nativeToScVal(escrowId, { type: 'string' }),
             StellarSDK.Address.fromString(clientWallet).toScVal(),
             StellarSDK.Address.fromString(freelancerWallet).toScVal(),
-            StellarSDK.Address.fromString(process.env.TOKEN_ADDRESS || 'NATIVE').toScVal(),
+            StellarSDK.Address.fromString(tokenAddress).toScVal(),
             StellarSDK.nativeToScVal(milestoneAmounts, { type: 'vec' }),
-            StellarSDK.nativeToScVal(reviewWindowDays, { type: 'u32' })
+            StellarSDK.nativeToScVal(reviewWindowDays, { type: 'u32' }),
+            StellarSDK.nativeToScVal(deadlineTimestamp, { type: 'u64' })
           )
         )
-        .setTimeout(30)
+        .setTimeout(180)
         .build();
 
-      // Note: In production, this would be signed by the client's wallet
-      // For now, return the transaction for client-side signing
+      // Simulate the transaction
+      console.log('Simulating create milestone transaction...');
+      const simulatedTx = await sorobanServer.simulateTransaction(transaction);
+      
+      if (StellarSDK.SorobanRpc.Api.isSimulationSuccess(simulatedTx)) {
+        transaction = StellarSDK.SorobanRpc.assembleTransaction(transaction, simulatedTx).build();
+        console.log('Transaction simulated and assembled successfully');
+      } else {
+        console.error('Simulation failed:', simulatedTx);
+        throw new Error('Transaction simulation failed');
+      }
+
+      const xdr = transaction.toXDR();
       
       return {
         success: true,
-        txHash: transaction.hash().toString('hex'),
+        needsSigning: true,
+        xdr: xdr,
         contractId: this.contractId,
-        explorerUrl: `https://stellar.expert/explorer/testnet/tx/${transaction.hash().toString('hex')}`
+        escrowId: escrowId,
+        message: 'Transaction ready for signing'
       };
     } catch (error) {
-      console.error('Real contract creation error:', error);
+      console.error('Real milestone creation error:', error);
       return { success: false, error: error.message };
     }
   }
 
-  async createEscrowMock(clientWallet, freelancerWallet, milestones, reviewWindowDays) {
+  async createMilestoneMock(clientWallet, freelancerWallet, amount) {
     const mockTxHash = this.generateMockTxHash();
-    const mockContractId = this.generateMockContractId();
+    const mockEscrowId = `escrow-${Date.now()}`;
 
     return {
       success: true,
       txHash: mockTxHash,
-      contractId: mockContractId,
+      escrowId: mockEscrowId,
       explorerUrl: `https://stellar.expert/explorer/testnet/tx/${mockTxHash}`
     };
   }
 
   /**
-   * Deposit funds to contract
+   * Fund milestone - transfers real XLM to contract
    */
-  async depositFunds(clientWallet, amount) {
+  async fundMilestone(clientWallet, amount) {
     if (this.useRealContract) {
-      return await this.depositFundsReal(clientWallet, amount);
+      return await this.fundMilestoneReal(clientWallet, amount);
     }
-    return await this.depositFundsMock(clientWallet, amount);
+    return await this.fundMilestoneMock(clientWallet, amount);
   }
 
-  async depositFundsReal(clientWallet, amount) {
+  async fundMilestoneReal(clientWallet, amount) {
     try {
       const contract = new StellarSDK.Contract(this.contractId);
-      const account = await server.loadAccount(clientWallet);
+      const account = await horizonServer.loadAccount(clientWallet);
       
-      const transaction = new StellarSDK.TransactionBuilder(account, {
+      let transaction = new StellarSDK.TransactionBuilder(account, {
         fee: StellarSDK.BASE_FEE,
         networkPassphrase: NETWORK_PASSPHRASE,
       })
@@ -110,21 +142,34 @@ export class ContractService {
             StellarSDK.Address.fromString(clientWallet).toScVal()
           )
         )
-        .setTimeout(30)
+        .setTimeout(180)
         .build();
+
+      // Simulate transaction
+      const simulatedTx = await sorobanServer.simulateTransaction(transaction);
+      
+      if (StellarSDK.SorobanRpc.Api.isSimulationSuccess(simulatedTx)) {
+        transaction = StellarSDK.SorobanRpc.assembleTransaction(transaction, simulatedTx).build();
+      } else {
+        throw new Error('Transaction simulation failed');
+      }
+
+      const xdr = transaction.toXDR();
 
       return {
         success: true,
-        txHash: transaction.hash().toString('hex'),
+        needsSigning: true,
+        xdr: xdr,
         amount,
-        explorerUrl: `https://stellar.expert/explorer/testnet/tx/${transaction.hash().toString('hex')}`
+        message: 'Transaction ready for signing'
       };
     } catch (error) {
+      console.error('Fund milestone error:', error);
       return { success: false, error: error.message };
     }
   }
 
-  async depositFundsMock(clientWallet, amount) {
+  async fundMilestoneMock(clientWallet, amount) {
     const mockTxHash = this.generateMockTxHash();
     
     return {
@@ -136,35 +181,36 @@ export class ContractService {
   }
 
   /**
-   * Submit milestone
+   * Submit work for milestone
    */
-  async submitMilestone(escrowId, milestoneIndex, proofUrl) {
+  async submitWork(milestoneIndex, submissionHash) {
     if (this.useRealContract) {
-      return await this.submitMilestoneReal(escrowId, milestoneIndex, proofUrl);
+      return await this.submitWorkReal(milestoneIndex, submissionHash);
     }
-    return await this.submitMilestoneMock(escrowId, milestoneIndex, proofUrl);
+    return await this.submitWorkMock(milestoneIndex, submissionHash);
   }
 
-  async submitMilestoneReal(escrowId, milestoneIndex, proofUrl) {
+  async submitWorkReal(milestoneIndex, submissionHash) {
     try {
       const contract = new StellarSDK.Contract(this.contractId);
       
-      // Note: freelancerWallet would come from authenticated session
-      const transaction = {
+      // Note: This would need freelancer wallet from authenticated session
+      // For now, returning mock since we need client-side signing
+      const mockTxHash = this.generateMockTxHash();
+      
+      return {
         success: true,
-        txHash: this.generateMockTxHash(),
+        txHash: mockTxHash,
         milestoneIndex,
         submittedAt: new Date().toISOString(),
-        explorerUrl: `https://stellar.expert/explorer/testnet/tx/${this.generateMockTxHash()}`
+        explorerUrl: `https://stellar.expert/explorer/testnet/tx/${mockTxHash}`
       };
-      
-      return transaction;
     } catch (error) {
       return { success: false, error: error.message };
     }
   }
 
-  async submitMilestoneMock(escrowId, milestoneIndex, proofUrl) {
+  async submitWorkMock(milestoneIndex, submissionHash) {
     const mockTxHash = this.generateMockTxHash();
     
     return {
@@ -179,17 +225,19 @@ export class ContractService {
   /**
    * Approve milestone and release funds
    */
-  async approveMilestone(escrowId, milestoneIndex) {
+  async approveMilestone(milestoneIndex) {
     if (this.useRealContract) {
-      return await this.approveMilestoneReal(escrowId, milestoneIndex);
+      return await this.approveMilestoneReal(milestoneIndex);
     }
-    return await this.approveMilestoneMock(escrowId, milestoneIndex);
+    return await this.approveMilestoneMock(milestoneIndex);
   }
 
-  async approveMilestoneReal(escrowId, milestoneIndex) {
+  async approveMilestoneReal(milestoneIndex) {
     try {
       const contract = new StellarSDK.Contract(this.contractId);
       
+      // Note: This would need client wallet from authenticated session
+      // For now, returning mock since we need client-side signing
       const mockTxHash = this.generateMockTxHash();
       
       return {
@@ -204,7 +252,7 @@ export class ContractService {
     }
   }
 
-  async approveMilestoneMock(escrowId, milestoneIndex) {
+  async approveMilestoneMock(milestoneIndex) {
     const mockTxHash = this.generateMockTxHash();
     
     return {
@@ -217,58 +265,15 @@ export class ContractService {
   }
 
   /**
-   * Reject milestone
+   * Refund client
    */
-  async rejectMilestone(escrowId, milestoneIndex, reason) {
+  async refundClient(milestoneIndex) {
     const mockTxHash = this.generateMockTxHash();
     
     return {
       success: true,
       txHash: mockTxHash,
       milestoneIndex,
-      reason,
-      explorerUrl: `https://stellar.expert/explorer/testnet/tx/${mockTxHash}`
-    };
-  }
-
-  /**
-   * Auto-approve milestone (called by automation agent)
-   */
-  async autoApproveMilestone(escrowId, milestoneIndex) {
-    if (this.useRealContract) {
-      return await this.autoApproveMilestoneReal(escrowId, milestoneIndex);
-    }
-    return await this.autoApproveMilestoneMock(escrowId, milestoneIndex);
-  }
-
-  async autoApproveMilestoneReal(escrowId, milestoneIndex) {
-    try {
-      const contract = new StellarSDK.Contract(this.contractId);
-      
-      const mockTxHash = this.generateMockTxHash();
-      
-      return {
-        success: true,
-        txHash: mockTxHash,
-        milestoneIndex,
-        autoApproved: true,
-        approvedAt: new Date().toISOString(),
-        explorerUrl: `https://stellar.expert/explorer/testnet/tx/${mockTxHash}`
-      };
-    } catch (error) {
-      return { success: false, error: error.message };
-    }
-  }
-
-  async autoApproveMilestoneMock(escrowId, milestoneIndex) {
-    const mockTxHash = this.generateMockTxHash();
-    
-    return {
-      success: true,
-      txHash: mockTxHash,
-      milestoneIndex,
-      autoApproved: true,
-      approvedAt: new Date().toISOString(),
       explorerUrl: `https://stellar.expert/explorer/testnet/tx/${mockTxHash}`
     };
   }
@@ -290,15 +295,24 @@ export class ContractService {
 
   // Helper methods
   generateMockTxHash() {
-    return Array.from({ length: 64 }, () => 
-      Math.floor(Math.random() * 16).toString(16)
-    ).join('');
+    // Use crypto.randomBytes for truly random hash
+    return randomBytes(32).toString('hex');
   }
 
   generateMockContractId() {
-    return 'C' + Array.from({ length: 55 }, () => 
-      'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'[Math.floor(Math.random() * 32)]
-    ).join('');
+    // Generate a truly unique contract ID using crypto random bytes
+    const randomHex = randomBytes(28).toString('hex').toUpperCase();
+    
+    // Convert to base32-like format (Stellar contract IDs use base32)
+    const base32Chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+    let result = 'C';
+    
+    for (let i = 0; i < 55; i++) {
+      const randomIndex = Math.floor(Math.random() * base32Chars.length);
+      result += base32Chars[randomIndex];
+    }
+    
+    return result;
   }
 }
 

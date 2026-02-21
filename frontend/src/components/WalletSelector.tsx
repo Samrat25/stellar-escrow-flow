@@ -19,15 +19,7 @@ const WalletSelector = ({ open, onOpenChange, onConnect }: WalletSelectorProps) 
   // Refresh wallet list when dialog opens
   useEffect(() => {
     if (open) {
-      // Immediate check
       setWallets(getAvailableWallets());
-      
-      // Check again after a delay for late-loading extensions
-      const timer = setTimeout(() => {
-        setWallets(getAvailableWallets());
-      }, 300);
-      
-      return () => clearTimeout(timer);
     }
   }, [open]);
 
@@ -91,9 +83,7 @@ const WalletSelector = ({ open, onOpenChange, onConnect }: WalletSelectorProps) 
         <div className="space-y-3 mt-4">
           {freighterWallet && (
             <Card
-              className={`p-4 cursor-pointer transition-all hover:border-primary border-2 ${
-                !freighterWallet.installed ? 'opacity-60 border-yellow-500' : 'border-primary'
-              }`}
+              className="p-4 cursor-pointer transition-all hover:border-primary border-2 border-primary"
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -104,49 +94,38 @@ const WalletSelector = ({ open, onOpenChange, onConnect }: WalletSelectorProps) 
                       <span className="text-xs bg-primary text-primary-foreground px-2 py-0.5 rounded">RECOMMENDED</span>
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      {freighterWallet.installed ? 'Installed' : 'Not detected - Click refresh or allow site access'}
+                      Browser extension wallet for Stellar
                     </p>
                   </div>
                 </div>
                 
-                {freighterWallet.installed ? (
-                  <Button
-                    size="sm"
-                    onClick={() => handleConnect(freighterWallet.type)}
-                    disabled={connecting !== null}
-                  >
-                    {connecting === freighterWallet.type ? (
-                      <div className="flex items-center gap-2">
-                        <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
-                        Connecting...
-                      </div>
-                    ) : (
-                      <>
-                        <Check className="h-3 w-3 mr-1" />
-                        Connect
-                      </>
-                    )}
-                  </Button>
-                ) : (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleDownload(freighterWallet.type)}
-                  >
-                    <ExternalLink className="h-3 w-3 mr-1" />
-                    Install
-                  </Button>
-                )}
+                <Button
+                  size="sm"
+                  onClick={() => handleConnect(freighterWallet.type)}
+                  disabled={connecting !== null}
+                >
+                  {connecting === freighterWallet.type ? (
+                    <div className="flex items-center gap-2">
+                      <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
+                      Connecting...
+                    </div>
+                  ) : (
+                    <>
+                      <Check className="h-3 w-3 mr-1" />
+                      Connect
+                    </>
+                  )}
+                </Button>
               </div>
             </Card>
           )}
 
           {!freighterWallet?.installed && (
-            <div className="p-3 bg-yellow-500/10 border border-yellow-500/50 rounded-lg flex items-start gap-2">
-              <AlertCircle className="h-4 w-4 text-yellow-500 mt-0.5" />
-              <div className="text-xs text-yellow-600 dark:text-yellow-400">
-                <p className="font-medium">Freighter not detected</p>
-                <p>If installed: Click Freighter icon → Allow site access → Refresh</p>
+            <div className="p-3 bg-blue-500/10 border border-blue-500/50 rounded-lg flex items-start gap-2">
+              <AlertCircle className="h-4 w-4 text-blue-500 mt-0.5" />
+              <div className="text-xs text-blue-600 dark:text-blue-400">
+                <p className="font-medium">Don't have Freighter?</p>
+                <p>Click "Connect" and you'll be guided to install it if needed.</p>
               </div>
             </div>
           )}

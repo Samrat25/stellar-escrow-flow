@@ -1,7 +1,7 @@
-import { PrismaClient } from '@prisma/client';
+// This file is deprecated and replaced by database.js
+// Keeping for backward compatibility only
 
-const prisma = new PrismaClient({
-  log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
-});
+console.warn('WARNING: prisma.js is deprecated, use database.js instead');
 
-export default prisma;
+export default null;
+

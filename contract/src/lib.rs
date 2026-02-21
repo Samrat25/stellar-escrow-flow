@@ -9,6 +9,7 @@ pub enum EscrowState {
     Funded = 1,
     Active = 2,
     Completed = 3,
+    Cancelled = 4,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -27,6 +28,7 @@ pub struct Milestone {
     pub status: MilestoneStatus,
     pub submitted_at: u64,
     pub approved_at: u64,
+    pub deadline: u64,
 }
 
 #[contracttype]
@@ -40,12 +42,14 @@ pub struct Escrow {
     pub review_window: u64,
     pub state: EscrowState,
     pub created_at: u64,
+    pub deadline: u64,
 }
 
 #[contracttype]
 pub enum DataKey {
     Escrow,
     Token,
+    ReleasedAmount,
 }
 
 #[contract]
@@ -61,11 +65,13 @@ impl EscrowContract {
         token: Address,
         milestone_amounts: Vec<i128>,
         review_window_days: u32,
+        deadline_timestamp: u64,
     ) {
         client.require_auth();
         assert!(client != freelancer, "Client and freelancer must differ");
         assert!(!milestone_amounts.is_empty(), "Need at least one milestone");
         assert!(review_window_days > 0, "Review window must be positive");
+        assert!(deadline_timestamp > env.ledger().timestamp(), "Deadline must be in future");
 
         let mut total_amount: i128 = 0;
         for i in 0..milestone_amounts.len() {
@@ -74,6 +80,7 @@ impl EscrowContract {
             total_amount += amount;
         }
 
+        let review_window_secs = (review_window_days as u64) * 86400;
         let mut milestones = Vec::new(&env);
         for i in 0..milestone_amounts.len() {
             let amount = milestone_amounts.get(i).unwrap();
@@ -82,23 +89,28 @@ impl EscrowContract {
                 status: MilestoneStatus::Pending,
                 submitted_at: 0,
                 approved_at: 0,
+                deadline: deadline_timestamp,
             });
         }
 
         let escrow = Escrow {
-            escrow_id,
+            escrow_id: escrow_id.clone(),
             client: client.clone(),
             freelancer: freelancer.clone(),
             total_amount,
             milestones,
-            review_window: (review_window_days as u64) * 86400,
+            review_window: review_window_secs,
             state: EscrowState::Created,
             created_at: env.ledger().timestamp(),
+            deadline: deadline_timestamp,
         };
 
         env.storage().instance().set(&DataKey::Escrow, &escrow);
         env.storage().instance().set(&DataKey::Token, &token);
-        env.events().publish((String::from_str(&env, "EscrowCreated"),), (client, freelancer, total_amount));
+        env.events().publish(
+            (String::from_str(&env, "EscrowCreated"),),
+            (escrow_id, client, freelancer, total_amount, deadline_timestamp),
+        );
     }
 
     pub fn deposit_funds(env: Env, client: Address) {
@@ -151,13 +163,16 @@ impl EscrowContract {
         let milestone = escrow.milestones.get(milestone_index).expect("Invalid milestone index");
         assert!(milestone.status == MilestoneStatus::Submitted, "Milestone not submitted");
 
+        let milestone_amount = milestone.amount;
+        let current_time = env.ledger().timestamp();
+
         let token_address: Address = env.storage().instance().get(&DataKey::Token).expect("Token not found");
         let token_client = token::Client::new(&env, &token_address);
-        token_client.transfer(&env.current_contract_address(), &escrow.freelancer, &milestone.amount);
+        token_client.transfer(&env.current_contract_address(), &escrow.freelancer, &milestone_amount);
 
         let mut updated_milestone = milestone;
         updated_milestone.status = MilestoneStatus::Approved;
-        updated_milestone.approved_at = env.ledger().timestamp();
+        updated_milestone.approved_at = current_time;
         escrow.milestones.set(milestone_index, updated_milestone);
 
         let mut all_approved = true;
@@ -174,7 +189,10 @@ impl EscrowContract {
         }
 
         env.storage().instance().set(&DataKey::Escrow, &escrow);
-        env.events().publish((String::from_str(&env, "MilestoneApproved"),), (client, milestone_index, milestone.amount));
+        env.events().publish(
+            (String::from_str(&env, "MilestoneApproved"),),
+            (client, milestone_index, milestone_amount, current_time),
+        );
     }
 
     pub fn reject_milestone(env: Env, client: Address, milestone_index: u32) {
@@ -202,9 +220,11 @@ impl EscrowContract {
         let deadline = milestone.submitted_at + escrow.review_window;
         assert!(current_time >= deadline, "Review window not expired");
 
+        let milestone_amount = milestone.amount;
+        
         let token_address: Address = env.storage().instance().get(&DataKey::Token).expect("Token not found");
         let token_client = token::Client::new(&env, &token_address);
-        token_client.transfer(&env.current_contract_address(), &escrow.freelancer, &milestone.amount);
+        token_client.transfer(&env.current_contract_address(), &escrow.freelancer, &milestone_amount);
 
         let mut updated_milestone = milestone;
         updated_milestone.status = MilestoneStatus::Approved;
@@ -225,7 +245,42 @@ impl EscrowContract {
         }
 
         env.storage().instance().set(&DataKey::Escrow, &escrow);
-        env.events().publish((String::from_str(&env, "MilestoneAutoApproved"),), (milestone_index, milestone.amount));
+        env.events().publish(
+            (String::from_str(&env, "MilestoneAutoApproved"),),
+            (milestone_index, milestone_amount, current_time),
+        );
+    }
+
+    pub fn auto_release(env: Env, escrow_id: String) {
+        let mut escrow: Escrow = env.storage().instance().get(&DataKey::Escrow).expect("Escrow not found");
+        assert!(escrow.escrow_id == escrow_id, "Escrow ID mismatch");
+
+        let current_time = env.ledger().timestamp();
+        assert!(current_time >= escrow.deadline, "Deadline not passed");
+        assert!(escrow.state != EscrowState::Cancelled, "Cancellation not allowed");
+
+        // Auto-approve any submitted but unapproved milestones
+        for i in 0..escrow.milestones.len() {
+            let milestone = escrow.milestones.get(i).unwrap();
+            
+            if milestone.status == MilestoneStatus::Submitted {
+                let token_address: Address = env.storage().instance().get(&DataKey::Token).expect("Token not found");
+                let token_client = token::Client::new(&env, &token_address);
+                token_client.transfer(&env.current_contract_address(), &escrow.freelancer, &milestone.amount);
+
+                let mut updated_milestone = milestone;
+                updated_milestone.status = MilestoneStatus::Approved;
+                updated_milestone.approved_at = current_time;
+                escrow.milestones.set(i, updated_milestone);
+            }
+        }
+
+        escrow.state = EscrowState::Completed;
+        env.storage().instance().set(&DataKey::Escrow, &escrow);
+        env.events().publish(
+            (String::from_str(&env, "EscrowAutoReleased"),),
+            (escrow_id, current_time),
+        );
     }
 
     pub fn get_escrow(env: Env) -> Escrow {

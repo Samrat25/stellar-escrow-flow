@@ -1,10 +1,21 @@
 import { motion } from 'framer-motion';
 import { Shield, ArrowRight, Globe, Lock, Zap } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import HowItWorks from '@/components/HowItWorks';
+import { useStellarWallet } from '@/contexts/WalletContext';
+import { useEffect } from 'react';
 
 const Index = () => {
+  const { address } = useStellarWallet();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    // Auto-redirect to dashboard if wallet is connected
+    if (address) {
+      navigate('/dashboard');
+    }
+  }, [address, navigate]);
   return (
     <div className="min-h-screen bg-background bg-grid">
       {/* Hero */}
