@@ -225,29 +225,57 @@ export class ContractService {
   /**
    * Approve milestone and release funds
    */
-  async approveMilestone(milestoneIndex) {
+  async approveMilestone(clientWallet, escrowId, milestoneIndex) {
     if (this.useRealContract) {
-      return await this.approveMilestoneReal(milestoneIndex);
+      return await this.approveMilestoneReal(clientWallet, escrowId, milestoneIndex);
     }
     return await this.approveMilestoneMock(milestoneIndex);
   }
 
-  async approveMilestoneReal(milestoneIndex) {
+  async approveMilestoneReal(clientWallet, escrowId, milestoneIndex) {
     try {
       const contract = new StellarSDK.Contract(this.contractId);
+      const account = await horizonServer.loadAccount(clientWallet);
       
-      // Note: This would need client wallet from authenticated session
-      // For now, returning mock since we need client-side signing
-      const mockTxHash = this.generateMockTxHash();
+      // Build transaction to approve milestone
+      // The contract will automatically transfer XLM to freelancer
+      let transaction = new StellarSDK.TransactionBuilder(account, {
+        fee: StellarSDK.BASE_FEE,
+        networkPassphrase: NETWORK_PASSPHRASE,
+      })
+        .addOperation(
+          contract.call(
+            'approve_milestone',
+            StellarSDK.Address.fromString(clientWallet).toScVal(),
+            StellarSDK.nativeToScVal(milestoneIndex, { type: 'u32' })
+          )
+        )
+        .setTimeout(180)
+        .build();
+
+      // Simulate transaction
+      console.log('Simulating approve milestone transaction...');
+      const simulatedTx = await sorobanServer.simulateTransaction(transaction);
+      
+      if (StellarSDK.SorobanRpc.Api.isSimulationSuccess(simulatedTx)) {
+        transaction = StellarSDK.SorobanRpc.assembleTransaction(transaction, simulatedTx).build();
+        console.log('Transaction simulated and assembled successfully');
+      } else {
+        console.error('Simulation failed:', simulatedTx);
+        throw new Error('Transaction simulation failed');
+      }
+
+      const xdr = transaction.toXDR();
       
       return {
         success: true,
-        txHash: mockTxHash,
+        needsSigning: true,
+        xdr: xdr,
         milestoneIndex,
-        approvedAt: new Date().toISOString(),
-        explorerUrl: `https://stellar.expert/explorer/testnet/tx/${mockTxHash}`
+        message: 'Transaction ready for signing - will transfer XLM to freelancer'
       };
     } catch (error) {
+      console.error('Real milestone approval error:', error);
       return { success: false, error: error.message };
     }
   }

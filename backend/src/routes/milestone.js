@@ -398,6 +398,8 @@ router.post('/approve', verifyMode, requireBuyingMode, verifyClientOwnership, lo
     // Call contract to approve and release funds
     const contractService = new ContractService(milestone.escrow.contractId);
     const result = await contractService.approveMilestone(
+      clientWallet,
+      milestone.escrow.escrowIdOnChain,
       milestone.milestoneIndex
     );
 
