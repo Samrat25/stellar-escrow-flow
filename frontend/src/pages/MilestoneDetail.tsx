@@ -12,7 +12,8 @@ import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import { formatXLM } from '@/lib/stellar';
 import { ArrowLeft, Loader2, ExternalLink, CheckCircle2, Clock, AlertCircle } from 'lucide-react';
-import { SorobanRpc, TransactionBuilder, Networks } from '@stellar/stellar-sdk';
+import { Server } from '@stellar/stellar-sdk/rpc';
+import { TransactionBuilder, Networks } from '@stellar/stellar-sdk';
 
 const MilestoneDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -58,17 +59,19 @@ const MilestoneDetail = () => {
       if (result.needsSigning && result.xdr) {
         toast.info('Please sign the transaction in your wallet');
         
-        const signedXdr = await kit?.signTransaction(result.xdr);
+        const signedResult = await kit?.signTransaction(result.xdr);
         
-        if (!signedXdr) {
+        if (!signedResult) {
           throw new Error('Transaction signing cancelled');
         }
 
         // Submit signed transaction to Stellar network
         toast.info('Submitting transaction to blockchain...');
         
-        const server = new SorobanRpc.Server('https://soroban-testnet.stellar.org');
+        const server = new Server('https://soroban-testnet.stellar.org');
+        const signedXdr = signedResult.signedTxXdr;
         const tx = TransactionBuilder.fromXDR(signedXdr, Networks.TESTNET);
+        
         const submitResult = await server.sendTransaction(tx);
         
         // Wait for transaction confirmation
@@ -132,17 +135,19 @@ const MilestoneDetail = () => {
       if (result.needsSigning && result.xdr) {
         toast.info('Please sign the transaction in your wallet');
         
-        const signedXdr = await kit?.signTransaction(result.xdr);
+        const signedResult = await kit?.signTransaction(result.xdr);
         
-        if (!signedXdr) {
+        if (!signedResult) {
           throw new Error('Transaction signing cancelled');
         }
 
         // Submit to blockchain
         toast.info('Submitting to blockchain...');
         
-        const server = new SorobanRpc.Server('https://soroban-testnet.stellar.org');
+        const server = new Server('https://soroban-testnet.stellar.org');
+        const signedXdr = signedResult.signedTxXdr;
         const tx = TransactionBuilder.fromXDR(signedXdr, Networks.TESTNET);
+        
         const submitResult = await server.sendTransaction(tx);
         
         // Wait for confirmation
@@ -199,17 +204,19 @@ const MilestoneDetail = () => {
       if (result.needsSigning && result.xdr) {
         toast.info('Please sign the transaction in your wallet');
         
-        const signedXdr = await kit?.signTransaction(result.xdr);
+        const signedResult = await kit?.signTransaction(result.xdr);
         
-        if (!signedXdr) {
+        if (!signedResult) {
           throw new Error('Transaction signing cancelled');
         }
 
         // Submit to blockchain
         toast.info('Releasing funds to freelancer...');
         
-        const server = new SorobanRpc.Server('https://soroban-testnet.stellar.org');
+        const server = new Server('https://soroban-testnet.stellar.org');
+        const signedXdr = signedResult.signedTxXdr;
         const tx = TransactionBuilder.fromXDR(signedXdr, Networks.TESTNET);
+        
         const submitResult = await server.sendTransaction(tx);
         
         // Wait for confirmation

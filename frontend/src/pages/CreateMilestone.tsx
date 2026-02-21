@@ -10,13 +10,15 @@ import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { SorobanRpc, TransactionBuilder, Networks } from '@stellar/stellar-sdk';
+import { Server } from '@stellar/stellar-sdk/rpc';
+import { TransactionBuilder, Networks } from '@stellar/stellar-sdk';
 
 const CreateMilestone = () => {
   const { address, kit } = useStellarWallet();
   const { mode } = useMode();
   const navigate = useNavigate();
   
+  const [title, setTitle] = useState('');
   const [freelancerWallet, setFreelancerWallet] = useState('');
   const [amount, setAmount] = useState('');
   const [loading, setLoading] = useState(false);
@@ -34,7 +36,7 @@ const CreateMilestone = () => {
       return;
     }
 
-    if (!freelancerWallet || !amount) {
+    if (!title || !freelancerWallet || !amount) {
       toast.error('Please fill all fields');
       return;
     }
@@ -53,6 +55,7 @@ const CreateMilestone = () => {
         clientWallet: address,
         freelancerWallet,
         amount: amountNum,
+        title,
         mode
       });
 
@@ -64,17 +67,21 @@ const CreateMilestone = () => {
       if (createResult.needsSigning && createResult.xdr) {
         toast.info('Please sign the transaction in your wallet');
         
-        const signedXdr = await kit?.signTransaction(createResult.xdr);
+        const signedResult = await kit?.signTransaction(createResult.xdr);
         
-        if (!signedXdr) {
+        if (!signedResult) {
           throw new Error('Transaction signing cancelled');
         }
 
         // Step 2: Submit signed transaction to Stellar network
         toast.info('Submitting transaction to blockchain...');
         
-        const server = new SorobanRpc.Server('https://soroban-testnet.stellar.org');
+        const server = new Server('https://soroban-testnet.stellar.org');
+        
+        // Parse the signed XDR - signedResult.signedTxXdr contains the XDR string
+        const signedXdr = signedResult.signedTxXdr;
         const tx = TransactionBuilder.fromXDR(signedXdr, Networks.TESTNET);
+        
         const submitResult = await server.sendTransaction(tx);
         
         // Step 3: Wait for transaction confirmation
@@ -104,6 +111,7 @@ const CreateMilestone = () => {
           clientWallet: address,
           freelancerWallet,
           amount: amountNum,
+          title,
           mode
         });
 
@@ -164,6 +172,21 @@ const CreateMilestone = () => {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleCreate} className="space-y-6">
+              <div className="space-y-2">
+                <Label htmlFor="title">Milestone Title</Label>
+                <Input
+                  id="title"
+                  placeholder="e.g., Design landing page mockups"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  disabled={loading}
+                  required
+                />
+                <p className="text-xs text-muted-foreground">
+                  Describe what work you need done
+                </p>
+              </div>
+
               <div className="space-y-2">
                 <Label htmlFor="freelancer">Freelancer Wallet Address</Label>
                 <Input

@@ -59,14 +59,14 @@ class ApiClient {
 
   // ===== MILESTONE ENDPOINTS =====
 
-  async createMilestone(data: { clientWallet: string; freelancerWallet: string; amount: number; mode: string }) {
+  async createMilestone(data: { clientWallet: string; freelancerWallet: string; amount: number; title: string; mode: string }) {
     return this.request('/milestone/create', {
       method: 'POST',
       body: JSON.stringify(data),
     });
   }
 
-  async completeMilestoneCreation(data: { txHash: string; contractId: string; escrowId: string; clientWallet: string; freelancerWallet: string; amount: number; mode: string }) {
+  async completeMilestoneCreation(data: { txHash: string; contractId: string; escrowId: string; clientWallet: string; freelancerWallet: string; amount: number; title: string; mode: string }) {
     return this.request('/milestone/complete-creation', {
       method: 'POST',
       body: JSON.stringify(data),

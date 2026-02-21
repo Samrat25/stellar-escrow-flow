@@ -23,7 +23,7 @@ const prisma = getDatabase();
  */
 router.post('/create', verifyMode, requireBuyingMode, logAccess('CREATE_MILESTONE'), async (req, res) => {
   try {
-    const { clientWallet, freelancerWallet, amount, mode } = req.body;
+    const { clientWallet, freelancerWallet, amount, title, mode } = req.body;
 
     // Validation
     if (!isValidStellarAddress(clientWallet) || !isValidStellarAddress(freelancerWallet)) {
@@ -36,6 +36,10 @@ router.post('/create', verifyMode, requireBuyingMode, logAccess('CREATE_MILESTON
 
     if (!amount || parseFloat(amount) <= 0) {
       return res.status(400).json({ error: 'Amount must be greater than 0' });
+    }
+
+    if (!title || title.trim().length === 0) {
+      return res.status(400).json({ error: 'Title is required' });
     }
 
     // Mode already verified by middleware
@@ -76,7 +80,8 @@ router.post('/create', verifyMode, requireBuyingMode, logAccess('CREATE_MILESTON
         milestoneData: {
           clientWallet,
           freelancerWallet,
-          amount: parseFloat(amount)
+          amount: parseFloat(amount),
+          title: title.trim()
         }
       });
     }
@@ -100,7 +105,7 @@ router.post('/create', verifyMode, requireBuyingMode, logAccess('CREATE_MILESTON
       data: {
         escrowId: escrow.id,
         milestoneIndex: 0,
-        description: `Milestone for ${parseFloat(amount)} XLM`,
+        description: title || `Milestone for ${parseFloat(amount)} XLM`,
         amount: parseFloat(amount),
         status: 'PENDING',
         creationTxHash: result.txHash
@@ -127,7 +132,7 @@ router.post('/create', verifyMode, requireBuyingMode, logAccess('CREATE_MILESTON
  */
 router.post('/complete-creation', verifyMode, requireBuyingMode, logAccess('COMPLETE_MILESTONE_CREATION'), async (req, res) => {
   try {
-    const { txHash, contractId, escrowId, clientWallet, freelancerWallet, amount } = req.body;
+    const { txHash, contractId, escrowId, clientWallet, freelancerWallet, amount, title } = req.body;
 
     if (!txHash || !contractId || !escrowId) {
       return res.status(400).json({ error: 'Missing required fields' });
@@ -153,7 +158,7 @@ router.post('/complete-creation', verifyMode, requireBuyingMode, logAccess('COMP
       data: {
         escrowId: escrow.id,
         milestoneIndex: 0,
-        description: `Milestone for ${parseFloat(amount)} XLM`,
+        description: title || `Milestone for ${parseFloat(amount)} XLM`,
         amount: parseFloat(amount),
         status: 'PENDING',
         creationTxHash: txHash
