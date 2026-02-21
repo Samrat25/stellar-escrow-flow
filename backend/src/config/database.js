@@ -7,16 +7,25 @@ let db = null;
 
 export function initializeDatabase() {
   if (!db) {
-    if (process.env.SUPABASE_URL && process.env.SUPABASE_ANON_KEY) {
-      // Using Supabase
+    if (process.env.SUPABASE_URL && (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY)) {
+      // Using Supabase - prefer service role key for backend operations
+      const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
+      const keyType = process.env.SUPABASE_SERVICE_ROLE_KEY ? 'Service Role' : 'Anon';
+      
       const supabase = createClient(
         process.env.SUPABASE_URL,
-        process.env.SUPABASE_ANON_KEY
+        supabaseKey
       );
       
       // Create a Prisma-like interface for Supabase
       db = createSupabaseAdapter(supabase);
-      console.log('Database: Using Supabase PostgreSQL');
+      console.log(`Database: Using Supabase PostgreSQL (${keyType} Key)`);
+      
+      if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+        console.warn('⚠️  WARNING: Using ANON key - some operations may fail!');
+        console.warn('   Add SUPABASE_SERVICE_ROLE_KEY to .env for full functionality');
+      }
+      
       console.log('⚠️  Make sure to run the SQL schema in Supabase SQL Editor!');
       console.log('   See backend/supabase-schema.sql');
     } else {
