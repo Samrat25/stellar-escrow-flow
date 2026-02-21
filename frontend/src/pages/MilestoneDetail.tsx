@@ -11,7 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import { formatXLM } from '@/lib/stellar';
-import { ArrowLeft, Loader2, ExternalLink, CheckCircle2, Clock, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Loader2, ExternalLink, CheckCircle2, Clock, AlertCircle, Upload, FileText } from 'lucide-react';
 import { Server } from '@stellar/stellar-sdk/rpc';
 import { TransactionBuilder, Networks } from '@stellar/stellar-sdk';
 
@@ -24,7 +24,8 @@ const MilestoneDetail = () => {
   const [milestone, setMilestone] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
-  const [submissionHash, setSubmissionHash] = useState('');
+  const [submissionText, setSubmissionText] = useState('');
+  const [submissionFiles, setSubmissionFiles] = useState<File[]>([]);
 
   useEffect(() => {
     if (!address) {
@@ -123,14 +124,24 @@ const MilestoneDetail = () => {
   };
 
   const handleSubmit = async () => {
-    if (!address || !milestone || !submissionHash.trim()) {
+    if (!address || !milestone || !submissionText.trim()) {
       toast.error('Please provide submission details');
       return;
     }
     
     setActionLoading(true);
     try {
-      const result = await api.submitMilestone(milestone.id, address, submissionHash, mode);
+      // Build submission data
+      let submissionData = submissionText;
+      
+      // If files are uploaded, add file info
+      if (submissionFiles.length > 0) {
+        const fileInfo = submissionFiles.map(f => `${f.name} (${(f.size / 1024).toFixed(2)} KB)`).join(', ');
+        submissionData += `\n\nFiles: ${fileInfo}`;
+        submissionData += '\n\nNote: Files should be uploaded to your preferred storage (Google Drive, Dropbox, etc.) and links included above.';
+      }
+      
+      const result = await api.submitMilestone(milestone.id, address, submissionData, mode);
       
       if (result.needsSigning && result.xdr) {
         toast.info('Please sign the transaction in your wallet');
@@ -173,17 +184,19 @@ const MilestoneDetail = () => {
             milestoneId: milestone.id,
             txHash: submitResult.hash,
             freelancerWallet: address,
-            submissionHash,
+            submissionHash: submissionData,
             mode
           })
         });
 
         toast.success('Work submitted!');
-        setSubmissionHash('');
+        setSubmissionText('');
+        setSubmissionFiles([]);
         loadMilestone();
       } else {
         toast.success('Work submitted!');
-        setSubmissionHash('');
+        setSubmissionText('');
+        setSubmissionFiles([]);
         loadMilestone();
       }
     } catch (error: any) {
@@ -359,7 +372,7 @@ const MilestoneDetail = () => {
                 {milestone.status === 'APPROVED' && (
                   <div className="flex items-center gap-2 text-sm text-green-600">
                     <CheckCircle2 className="h-4 w-4" />
-                    <span>Released to freelancer</span>
+                    <span>Paid to freelancer</span>
                   </div>
                 )}
               </div>
@@ -474,17 +487,63 @@ const MilestoneDetail = () => {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
-                  <Label htmlFor="submission">Submission Details</Label>
+                  <Label htmlFor="submission">Work Description & Links</Label>
                   <Textarea
                     id="submission"
-                    placeholder="Provide details about your completed work, links to deliverables, etc."
-                    value={submissionHash}
-                    onChange={(e) => setSubmissionHash(e.target.value)}
+                    placeholder="Describe your completed work and provide links to deliverables (Google Drive, Dropbox, GitHub, etc.)"
+                    value={submissionText}
+                    onChange={(e) => setSubmissionText(e.target.value)}
                     disabled={actionLoading}
                     rows={4}
                   />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Include links to your work files hosted on cloud storage
+                  </p>
                 </div>
-                <Button onClick={handleSubmit} disabled={actionLoading || !submissionHash.trim()} className="w-full">
+                
+                <div>
+                  <Label htmlFor="files">Attach Files (Optional)</Label>
+                  <div className="mt-2">
+                    <label htmlFor="files" className="flex items-center justify-center w-full h-32 px-4 transition bg-muted border-2 border-dashed rounded-md appearance-none cursor-pointer hover:border-primary focus:outline-none">
+                      <div className="flex flex-col items-center space-y-2">
+                        <Upload className="w-6 h-6 text-muted-foreground" />
+                        <span className="text-sm text-muted-foreground">
+                          {submissionFiles.length > 0 
+                            ? `${submissionFiles.length} file(s) selected` 
+                            : 'Click to upload files (images, videos, zip)'}
+                        </span>
+                      </div>
+                      <input
+                        id="files"
+                        type="file"
+                        multiple
+                        accept="image/*,video/*,.zip,.rar,.pdf"
+                        className="hidden"
+                        onChange={(e) => {
+                          if (e.target.files) {
+                            setSubmissionFiles(Array.from(e.target.files));
+                          }
+                        }}
+                        disabled={actionLoading}
+                      />
+                    </label>
+                  </div>
+                  {submissionFiles.length > 0 && (
+                    <div className="mt-2 space-y-1">
+                      {submissionFiles.map((file, idx) => (
+                        <div key={idx} className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <FileText className="h-3 w-3" />
+                          <span>{file.name} ({(file.size / 1024).toFixed(2)} KB)</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Note: Files are for reference only. Upload your work to cloud storage and include links above.
+                  </p>
+                </div>
+                
+                <Button onClick={handleSubmit} disabled={actionLoading || !submissionText.trim()} className="w-full">
                   {actionLoading ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -510,6 +569,33 @@ const MilestoneDetail = () => {
                 <p className="text-sm text-muted-foreground">
                   Your work has been submitted. The client will review and approve to release {formatXLM(milestone.amount)} to your wallet.
                 </p>
+              </CardContent>
+            </Card>
+          )}
+
+          {isFreelancer && milestone.status === 'APPROVED' && (
+            <Card className="border-green-500">
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2 text-green-600">
+                  <CheckCircle2 className="h-5 w-5" />
+                  Payment Received!
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  The client has approved your work and {formatXLM(milestone.amount)} has been transferred to your wallet. Check your balance!
+                </p>
+                {milestone.approvalTxHash && (
+                  <a 
+                    href={`https://stellar.expert/explorer/testnet/tx/${milestone.approvalTxHash}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 text-sm text-primary hover:underline"
+                  >
+                    <ExternalLink className="h-3 w-3" />
+                    View payment transaction
+                  </a>
+                )}
               </CardContent>
             </Card>
           )}
