@@ -361,19 +361,36 @@ function createSupabaseAdapter(supabase) {
         return data;
       },
       
+      findFirst: async ({ where }) => {
+        let query = supabase.from('Feedback').select('*');
+        
+        if (where.milestoneId) query = query.eq('milestoneId', where.milestoneId);
+        if (where.roleType) query = query.eq('roleType', where.roleType);
+        
+        const { data } = await query.limit(1).single();
+        return data;
+      },
+      
       findMany: async (query) => {
         let supabaseQuery = supabase.from('Feedback').select('*');
         
         if (query?.where) {
-          if (query.where.escrowId) {
-            supabaseQuery = supabaseQuery.eq('escrowId', query.where.escrowId);
+          if (query.where.reviewedWallet) {
+            supabaseQuery = supabaseQuery.eq('reviewedWallet', query.where.reviewedWallet);
           }
-          if (query.where.userId) {
-            supabaseQuery = supabaseQuery.eq('userId', query.where.userId);
+          if (query.where.roleType) {
+            supabaseQuery = supabaseQuery.eq('roleType', query.where.roleType);
           }
-          if (query.where.fromWallet) {
-            supabaseQuery = supabaseQuery.eq('fromWallet', query.where.fromWallet);
-          }
+        }
+        
+        if (query?.orderBy) {
+          const key = Object.keys(query.orderBy)[0];
+          const direction = query.orderBy[key] === 'desc' ? { ascending: false } : { ascending: true };
+          supabaseQuery = supabaseQuery.order(key, direction);
+        }
+        
+        if (query?.take) {
+          supabaseQuery = supabaseQuery.limit(query.take);
         }
         
         const { data, error } = await supabaseQuery;

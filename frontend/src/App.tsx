@@ -8,6 +8,9 @@ import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
 import CreateMilestone from "./pages/CreateMilestone";
 import MilestoneDetail from "./pages/MilestoneDetail";
+import Profile from "./pages/Profile";
+import FeedbackClient from "./pages/FeedbackClient";
+import FeedbackFreelancer from "./pages/FeedbackFreelancer";
 import NotFound from "./pages/NotFound";
 import { useStellarWallet } from './contexts/WalletContext';
 
@@ -34,6 +37,9 @@ const App = () => {
             <Route path="/milestone/:id" element={
               address ? <MilestoneDetail /> : <Navigate to="/" replace />
             } />
+            <Route path="/profile/:wallet" element={<Profile />} />
+            <Route path="/feedback/client" element={<FeedbackClient />} />
+            <Route path="/feedback/freelancer" element={<FeedbackFreelancer />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

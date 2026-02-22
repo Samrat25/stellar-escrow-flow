@@ -12,6 +12,7 @@ import {
   verifyParticipant,
   logAccess
 } from '../middleware/role-auth.js';
+import { sanitizeText, debugText } from '../utils/sanitize.js';
 
 const router = express.Router();
 const prisma = getDatabase();
@@ -138,18 +139,40 @@ router.post('/complete-creation', verifyMode, requireBuyingMode, logAccess('COMP
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
+    // Debug and sanitize all text fields
+    console.log('\n=== Milestone Creation Debug ===');
+    debugText(title, 'title');
+    debugText(contractId, 'contractId');
+    debugText(escrowId, 'escrowId');
+    debugText(txHash, 'txHash');
+
+    const sanitizedTitle = sanitizeText(title) || 'Milestone';
+    const sanitizedContractId = sanitizeText(contractId);
+    const sanitizedEscrowId = sanitizeText(escrowId);
+    const sanitizedTxHash = sanitizeText(txHash);
+    const sanitizedClientWallet = sanitizeText(clientWallet);
+    const sanitizedFreelancerWallet = sanitizeText(freelancerWallet);
+
+    console.log('Sanitized values:', {
+      title: sanitizedTitle,
+      contractIdLength: sanitizedContractId?.length,
+      escrowIdLength: sanitizedEscrowId?.length,
+      txHashLength: sanitizedTxHash?.length
+    });
+    console.log('================================\n');
+
     // Create escrow record
     const escrow = await prisma.escrow.create({
       data: {
-        contractId,
-        escrowIdOnChain: escrowId,
-        clientWallet,
-        freelancerWallet,
+        contractId: sanitizedContractId,
+        escrowIdOnChain: sanitizedEscrowId,
+        clientWallet: sanitizedClientWallet,
+        freelancerWallet: sanitizedFreelancerWallet,
         totalAmount: parseFloat(amount),
         status: 'CREATED',
         reviewWindowDays: 7,
         deadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-        creationTxHash: txHash
+        creationTxHash: sanitizedTxHash
       }
     });
 
@@ -158,10 +181,10 @@ router.post('/complete-creation', verifyMode, requireBuyingMode, logAccess('COMP
       data: {
         escrowId: escrow.id,
         milestoneIndex: 0,
-        description: title || `Milestone for ${parseFloat(amount)} XLM`,
+        description: sanitizedTitle,
         amount: parseFloat(amount),
         status: 'PENDING',
-        creationTxHash: txHash
+        creationTxHash: sanitizedTxHash
       }
     });
 
@@ -357,12 +380,15 @@ router.post('/complete-submission', verifyMode, requireSellingMode, verifyFreela
       return res.status(400).json({ error: 'Transaction hash required' });
     }
 
+    // Sanitize submission text to remove emojis
+    const sanitizedSubmission = sanitizeText(submissionHash);
+
     // Update milestone
     await prisma.milestone.update({
       where: { id: milestoneId },
       data: {
         status: 'SUBMITTED',
-        proofUrl: submissionHash,
+        proofUrl: sanitizedSubmission,
         submittedAt: new Date(),
         submissionTxHash: txHash
       }

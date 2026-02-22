@@ -3,6 +3,7 @@ import { Shield, ArrowRight, Globe, Lock, Zap } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import HowItWorks from '@/components/HowItWorks';
+import OrbitReviews from '@/components/OrbitReviews';
 import { useStellarWallet } from '@/contexts/WalletContext';
 import { useEffect } from 'react';
 
@@ -85,6 +86,26 @@ const Index = () => {
 
       {/* How it works */}
       <HowItWorks />
+
+      {/* Reviews Section */}
+      <section className="py-24 border-t border-border">
+        <div className="container mx-auto px-4">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="text-center mb-12"
+          >
+            <h2 className="text-3xl font-bold mb-4">
+              Trusted by <span className="text-gradient">Real Users</span>
+            </h2>
+            <p className="text-muted-foreground max-w-2xl mx-auto">
+              See what our community members say about their experience with milestone-based escrow payments
+            </p>
+          </motion.div>
+          <OrbitReviews />
+        </div>
+      </section>
 
       {/* Transparency */}
       <section className="py-24 border-t border-border">

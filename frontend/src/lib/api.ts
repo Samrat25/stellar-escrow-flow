@@ -114,23 +114,40 @@ class ApiClient {
 
   // ===== FEEDBACK ENDPOINTS =====
 
-  async submitFeedback(escrowId: string, userId: string, rating: number, comment?: string, category?: string) {
-    return this.request('/feedback/submit', {
+  async submitFeedback(data: { milestoneId: string; reviewerWallet: string; reviewedWallet: string; rating: number; comment?: string; roleType: string }) {
+    return this.request('/feedback/create', {
       method: 'POST',
-      body: JSON.stringify({ escrowId, userId, rating, comment, category }),
+      body: JSON.stringify(data),
     });
   }
 
-  async getEscrowFeedback(escrowId: string) {
-    return this.request(`/feedback/escrow/${escrowId}`);
+  async getUserFeedback(wallet: string) {
+    return this.request(`/feedback/user/${wallet}`);
   }
 
-  async getUserFeedback(userId: string) {
-    return this.request(`/feedback/user/${userId}`);
+  async getLatestReviews() {
+    return this.request('/feedback/latest');
   }
 
-  async getFeedbackStats() {
-    return this.request('/feedback/stats');
+  async getClientReviews() {
+    return this.request('/feedback/client');
+  }
+
+  async getFreelancerReviews() {
+    return this.request('/feedback/freelancer');
+  }
+
+  // ===== PROFILE ENDPOINTS =====
+
+  async getProfile(wallet: string) {
+    return this.request(`/profile/${wallet}`);
+  }
+
+  async updateProfile(data: { walletAddress: string; username?: string; bio?: string; avatarUrl?: string; role?: string }) {
+    return this.request('/profile/update', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
   }
 
   // ===== USER ENDPOINTS =====

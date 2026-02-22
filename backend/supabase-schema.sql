@@ -1,13 +1,14 @@
 -- Create tables for Stellar Escrow Platform
 -- Generated from Prisma schema
 
--- User table
+-- User table with profile information
 CREATE TABLE IF NOT EXISTS "User" (
   "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   "walletAddress" TEXT UNIQUE NOT NULL,
-  "role" TEXT DEFAULT 'BOTH',
-  "displayName" TEXT,
-  "email" TEXT,
+  "username" TEXT,
+  "role" TEXT DEFAULT 'CLIENT',
+  "bio" TEXT,
+  "avatarUrl" TEXT,
   "reputation" DOUBLE PRECISION DEFAULT 5.0,
   "totalTransacted" DOUBLE PRECISION DEFAULT 0,
   "completedEscrows" INTEGER DEFAULT 0,
@@ -51,6 +52,8 @@ CREATE TABLE IF NOT EXISTS "Milestone" (
   "rejectedAt" TIMESTAMP,
   "reviewDeadline" TIMESTAMP,
   "autoApproved" BOOLEAN DEFAULT FALSE,
+  "creationTxHash" TEXT,
+  "fundingTxHash" TEXT,
   "submissionTxHash" TEXT,
   "approvalTxHash" TEXT,
   "rejectionTxHash" TEXT,
@@ -78,18 +81,21 @@ CREATE TABLE IF NOT EXISTS "TransactionLog" (
   FOREIGN KEY ("walletAddress") REFERENCES "User"("walletAddress")
 );
 
--- Feedback table
+-- Feedback table with dual review system
 CREATE TABLE IF NOT EXISTS "Feedback" (
   "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  "escrowId" UUID NOT NULL,
-  "userId" UUID NOT NULL,
-  "rating" INTEGER NOT NULL,
+  "milestoneId" UUID NOT NULL,
+  "reviewerWallet" TEXT NOT NULL,
+  "reviewedWallet" TEXT NOT NULL,
+  "rating" INTEGER NOT NULL CHECK ("rating" >= 1 AND "rating" <= 5),
   "comment" TEXT,
-  "category" TEXT DEFAULT 'GENERAL',
+  "roleType" TEXT NOT NULL CHECK ("roleType" IN ('CLIENT_REVIEW', 'FREELANCER_REVIEW')),
   "createdAt" TIMESTAMP DEFAULT NOW(),
   "updatedAt" TIMESTAMP DEFAULT NOW(),
-  FOREIGN KEY ("escrowId") REFERENCES "Escrow"("id") ON DELETE CASCADE,
-  FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE
+  FOREIGN KEY ("milestoneId") REFERENCES "Milestone"("id") ON DELETE CASCADE,
+  FOREIGN KEY ("reviewerWallet") REFERENCES "User"("walletAddress"),
+  FOREIGN KEY ("reviewedWallet") REFERENCES "User"("walletAddress"),
+  UNIQUE ("milestoneId", "roleType")
 );
 
 -- AgentLog table
@@ -127,7 +133,10 @@ CREATE INDEX IF NOT EXISTS "idx_milestone_escrow" ON "Milestone"("escrowId");
 CREATE INDEX IF NOT EXISTS "idx_milestone_status" ON "Milestone"("status");
 CREATE INDEX IF NOT EXISTS "idx_transaction_escrow" ON "TransactionLog"("escrowId");
 CREATE INDEX IF NOT EXISTS "idx_transaction_wallet" ON "TransactionLog"("walletAddress");
-CREATE INDEX IF NOT EXISTS "idx_feedback_escrow" ON "Feedback"("escrowId");
+CREATE INDEX IF NOT EXISTS "idx_feedback_milestone" ON "Feedback"("milestoneId");
+CREATE INDEX IF NOT EXISTS "idx_feedback_reviewer" ON "Feedback"("reviewerWallet");
+CREATE INDEX IF NOT EXISTS "idx_feedback_reviewed" ON "Feedback"("reviewedWallet");
+CREATE INDEX IF NOT EXISTS "idx_feedback_role_type" ON "Feedback"("roleType");
 CREATE INDEX IF NOT EXISTS "idx_agentlog_escrow" ON "AgentLog"("escrowId");
 
 -- Create updated_at trigger function

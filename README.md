@@ -13,7 +13,10 @@ Stellar Escrow Flow is a **Blue Belt compliant** MVP that demonstrates a complet
 - 🔐 Smart contracts lock funds until milestone approval
 - 📋 Multiple milestone tracking with sequential approval
 - ⏰ Automatic fund release after deadline passes
-- 📊 Feedback system with reputation tracking
+- 👤 User profiles with reputation system
+- ⭐ Dual feedback system (Client & Freelancer reviews)
+- 🎡 Animated circular review display on landing page
+- 📊 Comprehensive reputation tracking
 - 🤖 Intelligent automation agents for approvals and state sync
 - 💾 Supabase integration for metadata storage
 - 🎨 Modern React UI with real-time updates
@@ -120,10 +123,17 @@ POST /milestone/reject           - Reject with feedback
 
 ### Feedback & Reputation
 ```
-POST /feedback/submit            - Leave feedback (1-5 rating)
-GET /feedback/escrow/:id         - Escrow feedback
-GET /feedback/user/:id           - User reputation
-GET /feedback/stats              - Global statistics
+POST /feedback/create            - Create review for completed milestone
+GET /feedback/user/:wallet       - Get all reviews for a user
+GET /feedback/latest             - Get latest 10 reviews (landing page)
+GET /feedback/client             - Get reviews given TO clients
+GET /feedback/freelancer         - Get reviews given TO freelancers
+```
+
+### User Profile
+```
+GET /profile/:wallet             - Get user profile with stats
+POST /profile/update             - Update user profile (username, bio, avatar, role)
 ```
 
 ### User & Agent
@@ -136,10 +146,10 @@ GET /agent/logs                  - Recent agent activity
 ## Database Schema
 
 PostgreSQL on Supabase with tables:
-- **users** - Profiles, reputation, stats
+- **users** - Profiles, reputation, stats (username, bio, avatar, role)
 - **escrows** - Agreements with deadlines
 - **milestones** - Work items with status
-- **feedbacks** - Ratings and reviews
+- **feedback** - Dual review system (CLIENT_REVIEW, FREELANCER_REVIEW)
 - **transaction_logs** - Audit trail
 - **agent_logs** - Automation activity
 
@@ -155,6 +165,33 @@ auto_approve()         # Automatic approval after deadline
 auto_release()         # Release all funds when global deadline passes
 get_escrow()           # Query current state
 ```
+
+## User Experience Flow
+
+1. **Connect Wallet** → Auto-create profile
+2. **Edit Profile** → Set username, bio, avatar, role (Client/Freelancer)
+3. **Create Milestone** → Client sets up work agreement
+4. **Fund Milestone** → Client locks XLM in smart contract
+5. **Submit Work** → Freelancer uploads deliverables
+6. **Approve & Release** → Client approves, funds transfer automatically
+7. **Leave Review** → Both parties review each other (1-5 stars)
+8. **Build Reputation** → Reviews displayed on profile and landing page
+
+## Feedback System
+
+### Dual Review System
+- **Client reviews Freelancer** after milestone completion
+- **Freelancer reviews Client** after milestone completion
+- One review per milestone per role
+- Prevents duplicate and self-reviews
+- Average rating calculated automatically
+
+### Animated Orbit Display
+- Landing page shows latest 10 reviews
+- Mercury orbit style with glassmorphism
+- Smooth continuous rotation
+- Pause on hover for reading
+- Real-time updates from Supabase
 
 ## Automation Agents
 

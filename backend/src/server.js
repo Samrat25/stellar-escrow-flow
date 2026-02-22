@@ -7,6 +7,7 @@ import milestoneRoutes from './routes/milestone.js';
 import feedbackRoutes from './routes/feedback.js';
 import userRoutes from './routes/user.js';
 import agentRoutes from './routes/agent.js';
+import profileRoutes from './routes/profile.js';
 
 dotenv.config();
 initializeDatabase();
@@ -40,6 +41,7 @@ app.use('/milestone', milestoneRoutes);
 app.use('/feedback', feedbackRoutes);
 app.use('/user', userRoutes);
 app.use('/agent', agentRoutes);
+app.use('/profile', profileRoutes);
 
 /**
  * Error handling middleware

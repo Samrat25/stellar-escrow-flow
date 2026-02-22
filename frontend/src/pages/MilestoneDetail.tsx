@@ -26,6 +26,9 @@ const MilestoneDetail = () => {
   const [actionLoading, setActionLoading] = useState(false);
   const [submissionText, setSubmissionText] = useState('');
   const [submissionFiles, setSubmissionFiles] = useState<File[]>([]);
+  const [feedbackRating, setFeedbackRating] = useState(5);
+  const [feedbackComment, setFeedbackComment] = useState('');
+  const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
 
   useEffect(() => {
     if (!address) {
@@ -283,6 +286,38 @@ const MilestoneDetail = () => {
       loadMilestone();
     } catch (error: any) {
       toast.error(error.message || 'Failed to raise dispute');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleSubmitFeedback = async () => {
+    if (!address || !milestone || !feedbackComment.trim()) {
+      toast.error('Please provide a review comment');
+      return;
+    }
+
+    setActionLoading(true);
+    try {
+      const roleType = isClient ? 'CLIENT_REVIEW' : 'FREELANCER_REVIEW';
+      const reviewedWallet = isClient ? milestone.escrow.freelancerWallet : milestone.escrow.clientWallet;
+
+      await api.submitFeedback({
+        milestoneId: milestone.id,
+        reviewerWallet: address,
+        reviewedWallet,
+        rating: feedbackRating,
+        comment: feedbackComment,
+        roleType
+      });
+
+      toast.success('Review submitted successfully!');
+      setFeedbackSubmitted(true);
+      setFeedbackComment('');
+      setFeedbackRating(5);
+    } catch (error: any) {
+      console.error('Submit feedback error:', error);
+      toast.error(error.message || 'Failed to submit review');
     } finally {
       setActionLoading(false);
     }
@@ -612,6 +647,82 @@ const MilestoneDetail = () => {
                 <p className="text-sm text-muted-foreground">
                   This milestone is under dispute. Please contact support for resolution.
                 </p>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Feedback Section - Only show after milestone is approved */}
+          {milestone.status === 'APPROVED' && !feedbackSubmitted && (
+            <Card className="border-primary">
+              <CardHeader>
+                <CardTitle className="text-lg">Leave a Review</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  How was your experience working with {isClient ? 'the freelancer' : 'the client'}?
+                </p>
+                
+                <div>
+                  <Label>Rating</Label>
+                  <div className="flex items-center gap-2 mt-2">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <button
+                        key={star}
+                        onClick={() => setFeedbackRating(star)}
+                        className="focus:outline-none"
+                      >
+                        <Star
+                          className={`h-8 w-8 cursor-pointer transition-colors ${
+                            star <= feedbackRating
+                              ? 'fill-yellow-400 text-yellow-400'
+                              : 'text-gray-300 hover:text-yellow-200'
+                          }`}
+                        />
+                      </button>
+                    ))}
+                    <span className="ml-2 text-sm text-muted-foreground">
+                      {feedbackRating} / 5
+                    </span>
+                  </div>
+                </div>
+
+                <div>
+                  <Label htmlFor="feedback">Your Review</Label>
+                  <Textarea
+                    id="feedback"
+                    placeholder="Share your experience working on this milestone..."
+                    value={feedbackComment}
+                    onChange={(e) => setFeedbackComment(e.target.value)}
+                    disabled={actionLoading}
+                    rows={4}
+                  />
+                </div>
+
+                <Button 
+                  onClick={handleSubmitFeedback} 
+                  disabled={actionLoading || !feedbackComment.trim()}
+                  className="w-full"
+                >
+                  {actionLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Submitting...
+                    </>
+                  ) : (
+                    'Submit Review'
+                  )}
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+
+          {feedbackSubmitted && (
+            <Card className="border-green-500">
+              <CardContent className="pt-6">
+                <div className="flex items-center gap-2 text-green-600">
+                  <CheckCircle2 className="h-5 w-5" />
+                  <span className="text-sm font-medium">Thank you for your review!</span>
+                </div>
               </CardContent>
             </Card>
           )}
