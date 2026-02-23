@@ -1,6 +1,7 @@
 import { CreateEscrowRequest, CreateEscrowResponse, Escrow } from '@/types/escrow';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+// Use placeholder during build, real URL at runtime
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://placeholder-api.example.com';
 
 class ApiClient {
   private baseUrl: string;
