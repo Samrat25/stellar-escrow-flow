@@ -11,9 +11,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import { formatXLM } from '@/lib/stellar';
-import { ArrowLeft, Loader2, ExternalLink, CheckCircle2, Clock, AlertCircle, Upload, FileText } from 'lucide-react';
+import { ArrowLeft, Loader2, ExternalLink, CheckCircle2, Clock, AlertCircle, Upload, FileText, Star } from 'lucide-react';
 import { Server } from '@stellar/stellar-sdk/rpc';
 import { TransactionBuilder, Networks } from '@stellar/stellar-sdk';
+import IPFSUpload from '@/components/IPFSUpload';
 
 const MilestoneDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -24,8 +25,7 @@ const MilestoneDetail = () => {
   const [milestone, setMilestone] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
-  const [submissionText, setSubmissionText] = useState('');
-  const [submissionFiles, setSubmissionFiles] = useState<File[]>([]);
+  const [ipfsData, setIpfsData] = useState<any>(null);
   const [feedbackRating, setFeedbackRating] = useState(5);
   const [feedbackComment, setFeedbackComment] = useState('');
   const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
@@ -45,6 +45,26 @@ const MilestoneDetail = () => {
     try {
       const data = await api.getMilestone(id);
       setMilestone(data);
+      
+      // Check if user has already submitted feedback for this milestone
+      if (data.status === 'APPROVED' && address) {
+        try {
+          const isClient = data.escrow?.clientWallet === address;
+          const roleType = isClient ? 'CLIENT_REVIEW' : 'FREELANCER_REVIEW';
+          
+          // Try to fetch existing feedback
+          const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/feedback/milestone/${id}/${roleType}`);
+          if (response.ok) {
+            const existingFeedback = await response.json();
+            if (existingFeedback) {
+              setFeedbackSubmitted(true);
+            }
+          }
+          // 404 means no feedback exists yet - this is expected, don't log error
+        } catch (error) {
+          // Silently ignore - user hasn't submitted feedback yet
+        }
+      }
     } catch (error) {
       toast.error('Failed to load milestone');
       console.error(error);
@@ -127,24 +147,25 @@ const MilestoneDetail = () => {
   };
 
   const handleSubmit = async () => {
-    if (!address || !milestone || !submissionText.trim()) {
-      toast.error('Please provide submission details');
+    if (!address || !milestone || !ipfsData) {
+      toast.error('Please upload your work to IPFS first');
       return;
     }
     
     setActionLoading(true);
     try {
-      // Build submission data
-      let submissionData = submissionText;
-      
-      // If files are uploaded, add file info
-      if (submissionFiles.length > 0) {
-        const fileInfo = submissionFiles.map(f => `${f.name} (${(f.size / 1024).toFixed(2)} KB)`).join(', ');
-        submissionData += `\n\nFiles: ${fileInfo}`;
-        submissionData += '\n\nNote: Files should be uploaded to your preferred storage (Google Drive, Dropbox, etc.) and links included above.';
-      }
-      
-      const result = await api.submitMilestone(milestone.id, address, submissionData, mode);
+      const result = await api.submitMilestone(
+        milestone.id, 
+        address, 
+        ipfsData.cid,
+        mode,
+        {
+          submissionCid: ipfsData.cid,
+          submissionUrl: ipfsData.url,
+          submissionFilename: ipfsData.filename,
+          submissionSize: ipfsData.size
+        }
+      );
       
       if (result.needsSigning && result.xdr) {
         toast.info('Please sign the transaction in your wallet');
@@ -187,19 +208,22 @@ const MilestoneDetail = () => {
             milestoneId: milestone.id,
             txHash: submitResult.hash,
             freelancerWallet: address,
-            submissionHash: submissionData,
+            submissionCid: ipfsData.cid,
+            submissionUrl: ipfsData.url,
+            submissionFilename: ipfsData.filename,
+            submissionSize: ipfsData.size,
             mode
           })
         });
 
-        toast.success('Work submitted!');
-        setSubmissionText('');
-        setSubmissionFiles([]);
+        toast.success('Work submitted successfully!', {
+          description: 'Your work is now stored on IPFS'
+        });
+        setIpfsData(null);
         loadMilestone();
       } else {
         toast.success('Work submitted!');
-        setSubmissionText('');
-        setSubmissionFiles([]);
+        setIpfsData(null);
         loadMilestone();
       }
     } catch (error: any) {
@@ -216,6 +240,30 @@ const MilestoneDetail = () => {
     setActionLoading(true);
     try {
       const result = await api.approveMilestone(milestone.id, address, mode);
+      
+      // Handle fallback approval (no blockchain transaction needed)
+      if (result.usedFallback) {
+        toast.info('Approving milestone...');
+        
+        // Complete approval with mock transaction
+        await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/milestone/complete-approval`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            milestoneId: milestone.id,
+            txHash: result.mockTxHash,
+            clientWallet: address,
+            usedFallback: true,
+            mode
+          })
+        });
+
+        toast.success(`Milestone approved!`, {
+          description: 'Payment will be processed (contract integration pending)'
+        });
+        loadMilestone();
+        return;
+      }
       
       if (result.needsSigning && result.xdr) {
         toast.info('Please sign the transaction in your wallet');
@@ -317,7 +365,14 @@ const MilestoneDetail = () => {
       setFeedbackRating(5);
     } catch (error: any) {
       console.error('Submit feedback error:', error);
-      toast.error(error.message || 'Failed to submit review');
+      
+      // Handle duplicate submission gracefully
+      if (error.message?.includes('already submitted')) {
+        toast.info('You have already submitted a review for this milestone');
+        setFeedbackSubmitted(true);
+      } else {
+        toast.error(error.message || 'Failed to submit review');
+      }
     } finally {
       setActionLoading(false);
     }
@@ -489,12 +544,45 @@ const MilestoneDetail = () => {
                 <CardTitle className="text-lg">Review Submission</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                {milestone.proofUrl && (
+                {milestone.submissionCid && (
+                  <div className="p-4 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg">
+                    <div className="flex items-start gap-3">
+                      <div className="flex-shrink-0 w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
+                        <FileText className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                          Work Submitted on IPFS
+                        </p>
+                        <p className="text-xs text-blue-700 dark:text-blue-300 mt-1 font-mono break-all">
+                          CID: {milestone.submissionCid}
+                        </p>
+                        {milestone.submissionFilename && (
+                          <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                            File: {milestone.submissionFilename}
+                          </p>
+                        )}
+                        <a
+                          href={milestone.submissionUrl || `https://gateway.pinata.cloud/ipfs/${milestone.submissionCid}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-sm text-blue-600 dark:text-blue-400 hover:underline mt-2 font-medium"
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                          View Work on IPFS
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
+                {milestone.proofUrl && !milestone.submissionCid && (
                   <div>
                     <Label>Submission Details</Label>
                     <p className="text-sm mt-1 p-3 bg-muted rounded">{milestone.proofUrl}</p>
                   </div>
                 )}
+                
                 <div className="flex gap-2">
                   <Button onClick={handleApprove} disabled={actionLoading} className="flex-1">
                     {actionLoading ? (
@@ -518,76 +606,37 @@ const MilestoneDetail = () => {
           {isFreelancer && milestone.status === 'FUNDED' && (
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Submit Work</CardTitle>
+                <CardTitle className="text-lg">Submit Work via IPFS</CardTitle>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Upload your work to IPFS for permanent, decentralized storage
+                </p>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div>
-                  <Label htmlFor="submission">Work Description & Links</Label>
-                  <Textarea
-                    id="submission"
-                    placeholder="Describe your completed work and provide links to deliverables (Google Drive, Dropbox, GitHub, etc.)"
-                    value={submissionText}
-                    onChange={(e) => setSubmissionText(e.target.value)}
-                    disabled={actionLoading}
-                    rows={4}
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Include links to your work files hosted on cloud storage
-                  </p>
-                </div>
+                <IPFSUpload 
+                  onUploadComplete={(data) => setIpfsData(data)}
+                  disabled={actionLoading}
+                />
                 
-                <div>
-                  <Label htmlFor="files">Attach Files (Optional)</Label>
-                  <div className="mt-2">
-                    <label htmlFor="files" className="flex items-center justify-center w-full h-32 px-4 transition bg-muted border-2 border-dashed rounded-md appearance-none cursor-pointer hover:border-primary focus:outline-none">
-                      <div className="flex flex-col items-center space-y-2">
-                        <Upload className="w-6 h-6 text-muted-foreground" />
-                        <span className="text-sm text-muted-foreground">
-                          {submissionFiles.length > 0 
-                            ? `${submissionFiles.length} file(s) selected` 
-                            : 'Click to upload files (images, videos, zip)'}
-                        </span>
-                      </div>
-                      <input
-                        id="files"
-                        type="file"
-                        multiple
-                        accept="image/*,video/*,.zip,.rar,.pdf"
-                        className="hidden"
-                        onChange={(e) => {
-                          if (e.target.files) {
-                            setSubmissionFiles(Array.from(e.target.files));
-                          }
-                        }}
-                        disabled={actionLoading}
-                      />
-                    </label>
-                  </div>
-                  {submissionFiles.length > 0 && (
-                    <div className="mt-2 space-y-1">
-                      {submissionFiles.map((file, idx) => (
-                        <div key={idx} className="flex items-center gap-2 text-xs text-muted-foreground">
-                          <FileText className="h-3 w-3" />
-                          <span>{file.name} ({(file.size / 1024).toFixed(2)} KB)</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  <p className="text-xs text-muted-foreground mt-2">
-                    Note: Files are for reference only. Upload your work to cloud storage and include links above.
-                  </p>
-                </div>
-                
-                <Button onClick={handleSubmit} disabled={actionLoading || !submissionText.trim()} className="w-full">
+                <Button 
+                  onClick={handleSubmit} 
+                  disabled={actionLoading || !ipfsData} 
+                  className="w-full"
+                >
                   {actionLoading ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Submitting...
+                      Submitting to Blockchain...
                     </>
                   ) : (
-                    'Submit Work'
+                    'Submit Work to Contract'
                   )}
                 </Button>
+
+                {ipfsData && !actionLoading && (
+                  <p className="text-xs text-center text-muted-foreground">
+                    Ready to submit • CID: {ipfsData.cid.slice(0, 20)}...
+                  </p>
+                )}
               </CardContent>
             </Card>
           )}

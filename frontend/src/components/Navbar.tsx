@@ -112,6 +112,9 @@ const Navbar = () => {
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem asChild>
+                    <Link to={`/profile/${address}`}>My Profile</Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
                     <Link to="/dashboard">Dashboard</Link>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />

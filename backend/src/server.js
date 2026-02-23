@@ -6,8 +6,10 @@ import escrowRoutes from './routes/escrow.js';
 import milestoneRoutes from './routes/milestone.js';
 import feedbackRoutes from './routes/feedback.js';
 import userRoutes from './routes/user.js';
+import usersActiveRoutes from './routes/users-active.js';
 import agentRoutes from './routes/agent.js';
 import profileRoutes from './routes/profile.js';
+import ipfsRoutes from './routes/ipfs.js';
 
 dotenv.config();
 initializeDatabase();
@@ -40,8 +42,10 @@ app.use('/escrow', escrowRoutes);
 app.use('/milestone', milestoneRoutes);
 app.use('/feedback', feedbackRoutes);
 app.use('/user', userRoutes);
+app.use('/users', usersActiveRoutes);
 app.use('/agent', agentRoutes);
 app.use('/profile', profileRoutes);
+app.use('/ipfs', ipfsRoutes);
 
 /**
  * Error handling middleware

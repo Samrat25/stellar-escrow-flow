@@ -223,6 +223,75 @@ export class ContractService {
   }
 
   /**
+   * Submit milestone on-chain (freelancer submits work)
+   */
+  async submitMilestone(freelancerWallet, milestoneIndex) {
+    if (this.useRealContract) {
+      return await this.submitMilestoneReal(freelancerWallet, milestoneIndex);
+    }
+    return await this.submitMilestoneMock(milestoneIndex);
+  }
+
+  async submitMilestoneReal(freelancerWallet, milestoneIndex) {
+    try {
+      const contract = new StellarSDK.Contract(this.contractId);
+      const account = await horizonServer.loadAccount(freelancerWallet);
+      
+      // Build transaction to submit milestone
+      let transaction = new StellarSDK.TransactionBuilder(account, {
+        fee: StellarSDK.BASE_FEE,
+        networkPassphrase: NETWORK_PASSPHRASE,
+      })
+        .addOperation(
+          contract.call(
+            'submit_milestone',
+            StellarSDK.Address.fromString(freelancerWallet).toScVal(),
+            StellarSDK.nativeToScVal(milestoneIndex, { type: 'u32' })
+          )
+        )
+        .setTimeout(180)
+        .build();
+
+      // Simulate transaction
+      console.log('Simulating submit milestone transaction...');
+      const simulatedTx = await sorobanServer.simulateTransaction(transaction);
+      
+      if (StellarSDK.SorobanRpc.Api.isSimulationSuccess(simulatedTx)) {
+        transaction = StellarSDK.SorobanRpc.assembleTransaction(transaction, simulatedTx).build();
+        console.log('Transaction simulated and assembled successfully');
+      } else {
+        console.error('Simulation failed:', simulatedTx);
+        throw new Error('Transaction simulation failed');
+      }
+
+      const xdr = transaction.toXDR();
+      
+      return {
+        success: true,
+        needsSigning: true,
+        xdr: xdr,
+        milestoneIndex,
+        message: 'Transaction ready for signing - will mark milestone as submitted on-chain'
+      };
+    } catch (error) {
+      console.error('Real milestone submission error:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  async submitMilestoneMock(milestoneIndex) {
+    const mockTxHash = this.generateMockTxHash();
+    
+    return {
+      success: true,
+      txHash: mockTxHash,
+      milestoneIndex,
+      submittedAt: new Date().toISOString(),
+      explorerUrl: `https://stellar.expert/explorer/testnet/tx/${mockTxHash}`
+    };
+  }
+
+  /**
    * Approve milestone and release funds
    */
   async approveMilestone(clientWallet, escrowId, milestoneIndex) {

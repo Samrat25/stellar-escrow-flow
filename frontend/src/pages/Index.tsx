@@ -4,6 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import HowItWorks from '@/components/HowItWorks';
 import OrbitReviews from '@/components/OrbitReviews';
+import ActiveUsers from '@/components/ActiveUsers';
 import { useStellarWallet } from '@/contexts/WalletContext';
 import { useEffect } from 'react';
 
@@ -86,6 +87,9 @@ const Index = () => {
 
       {/* How it works */}
       <HowItWorks />
+
+      {/* Active Users Section */}
+      <ActiveUsers />
 
       {/* Reviews Section */}
       <section className="py-24 border-t border-border">

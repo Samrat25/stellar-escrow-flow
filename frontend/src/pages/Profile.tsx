@@ -10,7 +10,8 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
-import { ArrowLeft, Edit, Star, User, Briefcase } from 'lucide-react';
+import { formatXLM } from '@/lib/stellar';
+import { ArrowLeft, Edit, Star, User, Briefcase, ExternalLink, Copy, CheckCircle2, TrendingUp, TrendingDown } from 'lucide-react';
 
 const Profile = () => {
   const { wallet } = useParams<{ wallet: string }>();
@@ -20,6 +21,7 @@ const Profile = () => {
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
+  const [copied, setCopied] = useState(false);
   const [formData, setFormData] = useState({
     username: '',
     bio: '',
@@ -74,6 +76,15 @@ const Profile = () => {
     }
   };
 
+  const copyWallet = () => {
+    if (wallet) {
+      navigator.clipboard.writeText(wallet);
+      setCopied(true);
+      toast.success('Wallet address copied!');
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background bg-grid pt-24 flex items-center justify-center">
@@ -102,9 +113,11 @@ const Profile = () => {
     );
   }
 
+  const isFreelancer = profile.role === 'FREELANCER';
+
   return (
     <div className="min-h-screen bg-background bg-grid pt-24 pb-12">
-      <div className="container mx-auto px-4 max-w-4xl">
+      <div className="container mx-auto px-4 max-w-6xl">
         <Link to="/dashboard" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-6">
           <ArrowLeft className="h-4 w-4" /> Back to Dashboard
         </Link>
@@ -118,21 +131,46 @@ const Profile = () => {
                   <Avatar className="h-20 w-20">
                     <AvatarImage src={profile.avatarUrl} />
                     <AvatarFallback>
-                      {profile.username?.[0]?.toUpperCase() || 'U'}
+                      {profile.username?.[0]?.toUpperCase() || wallet?.slice(0, 2).toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
                   <div>
                     <CardTitle className="text-2xl">
-                      {profile.username || 'Anonymous User'}
+                      {profile.username || `${wallet?.slice(0, 8)}...${wallet?.slice(-6)}`}
                     </CardTitle>
-                    <p className="text-sm text-muted-foreground font-mono mt-1">
-                      {wallet?.slice(0, 8)}...{wallet?.slice(-6)}
-                    </p>
                     <div className="flex items-center gap-2 mt-2">
-                      <Badge variant={profile.role === 'CLIENT' ? 'default' : 'secondary'}>
-                        {profile.role === 'CLIENT' ? <User className="h-3 w-3 mr-1" /> : <Briefcase className="h-3 w-3 mr-1" />}
-                        {profile.role}
-                      </Badge>
+                      <button
+                        onClick={copyWallet}
+                        className="flex items-center gap-2 text-sm text-muted-foreground font-mono hover:text-foreground transition-colors"
+                      >
+                        {wallet?.slice(0, 12)}...{wallet?.slice(-8)}
+                        {copied ? (
+                          <CheckCircle2 className="h-3 w-3 text-green-500" />
+                        ) : (
+                          <Copy className="h-3 w-3" />
+                        )}
+                      </button>
+                    </div>
+                    <div className="flex items-center gap-2 mt-2 flex-wrap">
+                      {/* Show badges based on actual activity */}
+                      {profile.stats.totalEarnings > 0 && (
+                        <Badge variant="secondary">
+                          <Briefcase className="h-3 w-3 mr-1" />
+                          Freelancer
+                        </Badge>
+                      )}
+                      {profile.stats.totalSpending > 0 && (
+                        <Badge variant="default">
+                          <User className="h-3 w-3 mr-1" />
+                          Client
+                        </Badge>
+                      )}
+                      {profile.stats.totalEarnings === 0 && profile.stats.totalSpending === 0 && (
+                        <Badge variant="outline">
+                          {profile.role === 'CLIENT' ? <User className="h-3 w-3 mr-1" /> : <Briefcase className="h-3 w-3 mr-1" />}
+                          {profile.role}
+                        </Badge>
+                      )}
                       <div className="flex items-center gap-1">
                         <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
                         <span className="text-sm font-medium">{profile.stats.averageRating}</span>
@@ -207,13 +245,35 @@ const Profile = () => {
             </CardContent>
           </Card>
 
-          {/* Stats */}
-          <div className="grid md:grid-cols-3 gap-4">
+          {/* Stats - Show BOTH earnings and spending */}
+          <div className="grid md:grid-cols-4 gap-4">
+            <Card>
+              <CardContent className="pt-6">
+                <div className="text-center">
+                  <div className="flex items-center justify-center gap-2 mb-2">
+                    <TrendingUp className="h-5 w-5 text-green-500" />
+                    <p className="text-3xl font-bold text-green-600">{formatXLM(profile.stats.totalEarnings)}</p>
+                  </div>
+                  <p className="text-sm text-muted-foreground">Total Earned</p>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <div className="text-center">
+                  <div className="flex items-center justify-center gap-2 mb-2">
+                    <TrendingDown className="h-5 w-5 text-blue-500" />
+                    <p className="text-3xl font-bold text-blue-600">{formatXLM(profile.stats.totalSpending)}</p>
+                  </div>
+                  <p className="text-sm text-muted-foreground">Total Spent</p>
+                </div>
+              </CardContent>
+            </Card>
             <Card>
               <CardContent className="pt-6">
                 <div className="text-center">
                   <p className="text-3xl font-bold text-primary">{profile.stats.milestonesCreated}</p>
-                  <p className="text-sm text-muted-foreground mt-1">Milestones Created</p>
+                  <p className="text-sm text-muted-foreground mt-1">Created</p>
                 </div>
               </CardContent>
             </Card>
@@ -221,33 +281,115 @@ const Profile = () => {
               <CardContent className="pt-6">
                 <div className="text-center">
                   <p className="text-3xl font-bold text-primary">{profile.stats.milestonesCompleted}</p>
-                  <p className="text-sm text-muted-foreground mt-1">Milestones Completed</p>
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-6">
-                <div className="text-center">
-                  <div className="flex items-center justify-center gap-2">
-                    <Star className="h-6 w-6 fill-yellow-400 text-yellow-400" />
-                    <p className="text-3xl font-bold text-primary">{profile.stats.averageRating}</p>
-                  </div>
-                  <p className="text-sm text-muted-foreground mt-1">Average Rating</p>
+                  <p className="text-sm text-muted-foreground mt-1">Completed</p>
                 </div>
               </CardContent>
             </Card>
           </div>
 
-          {/* Recent Reviews */}
+          {/* Transaction History - Shows BOTH earnings and spending */}
+          {profile.transactionHistory && profile.transactionHistory.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Transaction History</CardTitle>
+                <p className="text-sm text-muted-foreground">All your completed milestones</p>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {profile.transactionHistory.map((tx: any) => (
+                    <div key={tx.milestoneId} className="border-b pb-4 last:border-0">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <Badge variant={tx.type === 'EARNING' ? 'default' : 'secondary'} className="text-xs">
+                              {tx.type === 'EARNING' ? (
+                                <><TrendingUp className="h-3 w-3 mr-1" />Earned</>
+                              ) : (
+                                <><TrendingDown className="h-3 w-3 mr-1" />Spent</>
+                              )}
+                            </Badge>
+                            <p className="font-medium">{tx.description}</p>
+                            <Badge variant="outline" className="text-xs">
+                              {tx.milestoneId.slice(0, 8)}...
+                            </Badge>
+                          </div>
+                          <p className="text-sm text-muted-foreground font-mono">
+                            {tx.otherPartyLabel}: {tx.otherParty.slice(0, 16)}...
+                          </p>
+                          <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
+                            {tx.approvedAt && (
+                              <span>{new Date(tx.approvedAt).toLocaleDateString()}</span>
+                            )}
+                            {tx.approvalTxHash && (
+                              <a
+                                href={`https://stellar.expert/explorer/testnet/tx/${tx.approvalTxHash}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-1 text-primary hover:underline"
+                              >
+                                <ExternalLink className="h-3 w-3" />
+                                View Transaction
+                              </a>
+                            )}
+                            {tx.submissionCid && (
+                              <a
+                                href={tx.submissionUrl || `https://gateway.pinata.cloud/ipfs/${tx.submissionCid}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-1 text-primary hover:underline"
+                              >
+                                <ExternalLink className="h-3 w-3" />
+                                View Work
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className={`text-lg font-bold ${tx.type === 'EARNING' ? 'text-green-600' : 'text-blue-600'}`}>
+                            {tx.type === 'EARNING' ? '+' : '-'}{formatXLM(tx.amount)}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Reviews */}
           <Card>
             <CardHeader>
-              <CardTitle>Recent Reviews</CardTitle>
+              <CardTitle>Reviews Received</CardTitle>
             </CardHeader>
             <CardContent>
-              {profile.recentReviews && profile.recentReviews.length > 0 ? (
+              {profile.reviews && profile.reviews.length > 0 ? (
                 <div className="space-y-4">
-                  {profile.recentReviews.map((review: any) => (
+                  {profile.reviews.map((review: any) => (
                     <div key={review.id} className="border-b pb-4 last:border-0">
+                      <div className="flex items-start gap-3 mb-2">
+                        <Avatar className="h-10 w-10">
+                          <AvatarFallback>
+                            {review.reviewer.username?.[0]?.toUpperCase() || review.reviewer.walletAddress.slice(0, 2).toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <Link
+                              to={`/profile/${review.reviewer.walletAddress}`}
+                              className="font-medium hover:underline"
+                            >
+                              {review.reviewer.username || `${review.reviewer.walletAddress.slice(0, 8)}...${review.reviewer.walletAddress.slice(-6)}`}
+                            </Link>
+                            <Badge variant="outline" className="text-xs">
+                              {review.reviewer.role}
+                            </Badge>
+                          </div>
+                          <p className="text-xs text-muted-foreground font-mono">
+                            {review.reviewer.walletAddress.slice(0, 16)}...
+                          </p>
+                        </div>
+                      </div>
                       <div className="flex items-center gap-2 mb-2">
                         {[...Array(5)].map((_, i) => (
                           <Star

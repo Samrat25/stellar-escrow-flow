@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Star } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -11,11 +12,13 @@ interface Review {
   roleType: string;
   createdAt: string;
   reviewer: {
+    walletAddress: string;
     username: string;
     avatarUrl?: string;
     role: string;
   };
   reviewed: {
+    walletAddress: string;
     username: string;
     role: string;
   };
@@ -23,7 +26,6 @@ interface Review {
 
 const OrbitReviews = () => {
   const [reviews, setReviews] = useState<Review[]>([]);
-  const [isPaused, setIsPaused] = useState(false);
 
   useEffect(() => {
     loadReviews();
@@ -42,61 +44,47 @@ const OrbitReviews = () => {
     return null;
   }
 
-  const radius = 280;
-  const angleStep = (2 * Math.PI) / reviews.length;
+  const getDisplayName = (user: any) => {
+    if (user.username) return user.username;
+    if (user.walletAddress) {
+      return `${user.walletAddress.slice(0, 8)}...${user.walletAddress.slice(-6)}`;
+    }
+    return 'User';
+  };
 
   return (
-    <div className="relative w-full h-[700px] flex items-center justify-center overflow-hidden">
-      {/* Center Circle */}
-      <div className="absolute z-10 flex flex-col items-center justify-center">
-        <div className="w-32 h-32 rounded-full bg-gradient-to-br from-primary to-primary/50 flex items-center justify-center shadow-2xl">
-          <Star className="w-16 h-16 text-white fill-white" />
-        </div>
-        <p className="mt-4 text-xl font-bold">Real Reviews</p>
-        <p className="text-sm text-muted-foreground">From Our Community</p>
+    <div className="relative w-full py-12 overflow-hidden">
+      <div className="text-center mb-8">
+        <h2 className="text-3xl font-bold mb-2">Real Reviews</h2>
+        <p className="text-muted-foreground">From Our Community</p>
       </div>
 
-      {/* Orbit Path */}
-      <div className="absolute w-[600px] h-[600px] border-2 border-dashed border-primary/20 rounded-full" />
-
-      {/* Review Cards in Orbit */}
-      <div
-        className={`absolute w-[600px] h-[600px] ${
-          isPaused ? '' : 'animate-spin-slow'
-        }`}
-        style={{ animationDuration: '60s' }}
-      >
-        {reviews.map((review, index) => {
-          const angle = index * angleStep;
-          const x = Math.cos(angle) * radius;
-          const y = Math.sin(angle) * radius;
-
-          return (
+      {/* Horizontal scrolling carousel */}
+      <div className="relative">
+        <div className="flex gap-6 animate-scroll-horizontal pb-4">
+          {/* Duplicate reviews for seamless loop */}
+          {[...reviews, ...reviews].map((review, index) => (
             <div
-              key={review.id}
-              className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2"
-              style={{
-                transform: `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`,
-              }}
-              onMouseEnter={() => setIsPaused(true)}
-              onMouseLeave={() => setIsPaused(false)}
+              key={`${review.id}-${index}`}
+              className="flex-shrink-0 w-80"
             >
-              <div
-                className={`w-64 p-4 rounded-lg glass border border-border shadow-lg hover:shadow-xl transition-all duration-300 ${
-                  isPaused ? '' : 'animate-counter-spin-slow'
-                }`}
-                style={{ animationDuration: '60s' }}
-              >
-                <div className="flex items-start gap-3 mb-3">
-                  <Avatar className="h-10 w-10">
+              <div className="h-full p-6 rounded-xl glass border border-border shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
+                <div className="flex items-start gap-3 mb-4">
+                  <Avatar className="h-12 w-12">
                     <AvatarImage src={review.reviewer.avatarUrl} />
                     <AvatarFallback>
-                      {review.reviewer.username?.[0]?.toUpperCase() || 'U'}
+                      {getDisplayName(review.reviewer)[0]?.toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium text-sm truncate">
-                      {review.reviewer.username || 'Anonymous'}
+                    <Link
+                      to={`/profile/${review.reviewer.walletAddress}`}
+                      className="font-medium text-sm hover:underline block truncate"
+                    >
+                      {getDisplayName(review.reviewer)}
+                    </Link>
+                    <p className="text-xs text-muted-foreground font-mono truncate">
+                      {review.reviewer.walletAddress.slice(0, 16)}...
                     </p>
                     <Badge variant="outline" className="text-xs mt-1">
                       {review.reviewer.role}
@@ -104,11 +92,11 @@ const OrbitReviews = () => {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-1 mb-2">
+                <div className="flex items-center gap-1 mb-3">
                   {[...Array(5)].map((_, i) => (
                     <Star
                       key={i}
-                      className={`h-3 w-3 ${
+                      className={`h-4 w-4 ${
                         i < review.rating
                           ? 'fill-yellow-400 text-yellow-400'
                           : 'text-gray-300'
@@ -117,47 +105,45 @@ const OrbitReviews = () => {
                   ))}
                 </div>
 
-                <p className="text-xs text-muted-foreground line-clamp-3">
+                <p className="text-sm text-muted-foreground line-clamp-4 mb-4">
                   {review.comment || 'Great experience working together!'}
                 </p>
 
-                <div className="mt-3 pt-3 border-t border-border">
+                <div className="pt-4 border-t border-border">
                   <p className="text-xs text-muted-foreground">
-                    Reviewed {review.reviewed.username || 'Anonymous'} •{' '}
-                    {new Date(review.createdAt).toLocaleDateString()}
+                    Reviewed{' '}
+                    <Link
+                      to={`/profile/${review.reviewed.walletAddress}`}
+                      className="hover:underline"
+                    >
+                      {getDisplayName(review.reviewed)}
+                    </Link>{' '}
+                    • {new Date(review.createdAt).toLocaleDateString()}
                   </p>
                 </div>
               </div>
             </div>
-          );
-        })}
+          ))}
+        </div>
       </div>
 
       <style>{`
-        @keyframes spin-slow {
-          from {
-            transform: rotate(0deg);
+        @keyframes scroll-horizontal {
+          0% {
+            transform: translateX(0);
           }
-          to {
-            transform: rotate(360deg);
-          }
-        }
-
-        @keyframes counter-spin-slow {
-          from {
-            transform: rotate(0deg);
-          }
-          to {
-            transform: rotate(-360deg);
+          100% {
+            transform: translateX(-50%);
           }
         }
 
-        .animate-spin-slow {
-          animation: spin-slow linear infinite;
+        .animate-scroll-horizontal {
+          animation: scroll-horizontal 40s linear infinite;
+          width: fit-content;
         }
 
-        .animate-counter-spin-slow {
-          animation: counter-spin-slow linear infinite;
+        .animate-scroll-horizontal:hover {
+          animation-play-state: paused;
         }
 
         .glass {

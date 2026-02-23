@@ -222,7 +222,12 @@ function createSupabaseAdapter(supabase) {
         
         if (query?.where) {
           if (query.where.escrowId) {
-            supabaseQuery = supabaseQuery.eq('escrowId', query.where.escrowId);
+            // Handle 'in' operator for escrowId
+            if (query.where.escrowId.in) {
+              supabaseQuery = supabaseQuery.in('escrowId', query.where.escrowId.in);
+            } else {
+              supabaseQuery = supabaseQuery.eq('escrowId', query.where.escrowId);
+            }
           }
           if (query.where.status) {
             supabaseQuery = supabaseQuery.eq('status', query.where.status);
@@ -314,15 +319,29 @@ function createSupabaseAdapter(supabase) {
       },
       
       update: async ({ where, data: updateData }) => {
-        let query = supabase.from('User').update(updateData);
-        
-        if (where.id) query = query.eq('id', where.id);
-        if (where.walletAddress) query = query.eq('walletAddress', where.walletAddress);
-        
-        const { data, error } = await query.select().single();
-        
-        if (error) throw new Error(error.message);
-        return data;
+        try {
+          let query = supabase.from('User').update(updateData);
+          
+          if (where.id) query = query.eq('id', where.id);
+          if (where.walletAddress) query = query.eq('walletAddress', where.walletAddress);
+          
+          const { data, error } = await query.select().maybeSingle();
+          
+          if (error) {
+            console.error('User update error:', error);
+            throw new Error(error.message);
+          }
+          
+          if (!data) {
+            console.warn('User not found for update:', where);
+            return null;
+          }
+          
+          return data;
+        } catch (error) {
+          console.error('User update exception:', error);
+          throw error;
+        }
       },
       
       upsert: async ({ where, update, create }) => {
@@ -362,13 +381,22 @@ function createSupabaseAdapter(supabase) {
       },
       
       findFirst: async ({ where }) => {
-        let query = supabase.from('Feedback').select('*');
-        
-        if (where.milestoneId) query = query.eq('milestoneId', where.milestoneId);
-        if (where.roleType) query = query.eq('roleType', where.roleType);
-        
-        const { data } = await query.limit(1).single();
-        return data;
+        try {
+          let query = supabase.from('Feedback').select('*');
+          
+          if (where.milestoneId) query = query.eq('milestoneId', where.milestoneId);
+          if (where.roleType) query = query.eq('roleType', where.roleType);
+          
+          const { data, error } = await query.limit(1).maybeSingle();
+          if (error) {
+            console.error('Feedback findFirst error:', error);
+            return null;
+          }
+          return data;
+        } catch (error) {
+          console.error('Feedback findFirst exception:', error);
+          return null;
+        }
       },
       
       findMany: async (query) => {

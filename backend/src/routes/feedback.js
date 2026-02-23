@@ -82,17 +82,32 @@ router.post('/create', async (req, res) => {
       }
     });
 
-    // Update user reputation
-    const allReviews = await prisma.feedback.findMany({
-      where: { reviewedWallet }
-    });
+    // Update user reputation - ensure user exists first
+    try {
+      // Ensure reviewed user exists
+      await prisma.user.upsert({
+        where: { walletAddress: reviewedWallet },
+        update: {},
+        create: { walletAddress: reviewedWallet }
+      });
 
-    const avgRating = allReviews.reduce((sum, r) => sum + r.rating, 0) / allReviews.length;
+      // Get all reviews for this user
+      const allReviews = await prisma.feedback.findMany({
+        where: { reviewedWallet }
+      });
 
-    await prisma.user.update({
-      where: { walletAddress: reviewedWallet },
-      data: { reputation: avgRating }
-    });
+      // Calculate average rating
+      const avgRating = allReviews.reduce((sum, r) => sum + r.rating, 0) / allReviews.length;
+
+      // Update reputation
+      await prisma.user.update({
+        where: { walletAddress: reviewedWallet },
+        data: { reputation: avgRating }
+      });
+    } catch (repError) {
+      console.error('Failed to update reputation:', repError);
+      // Don't fail the whole request if reputation update fails
+    }
 
     res.json({ success: true, feedback });
   } catch (error) {
@@ -138,7 +153,7 @@ router.get('/user/:wallet', async (req, res) => {
 
 /**
  * GET /feedback/latest
- * Get latest 10 reviews for landing page
+ * Get latest 10 reviews for landing page with full wallet info
  */
 router.get('/latest', async (req, res) => {
   try {
@@ -165,13 +180,15 @@ router.get('/latest', async (req, res) => {
           roleType: review.roleType,
           createdAt: review.createdAt,
           reviewer: {
-            username: reviewer?.username || 'Anonymous',
-            avatarUrl: reviewer?.avatarUrl,
-            role: reviewer?.role
+            walletAddress: review.reviewerWallet,
+            username: reviewer?.username || null,
+            avatarUrl: reviewer?.avatarUrl || null,
+            role: reviewer?.role || 'CLIENT'
           },
           reviewed: {
-            username: reviewed?.username || 'Anonymous',
-            role: reviewed?.role
+            walletAddress: review.reviewedWallet,
+            username: reviewed?.username || null,
+            role: reviewed?.role || 'CLIENT'
           }
         };
       })
@@ -254,6 +271,36 @@ router.get('/freelancer', async (req, res) => {
     res.json(reviewsWithInfo);
   } catch (error) {
     console.error('Get freelancer feedback error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * GET /feedback/milestone/:milestoneId/:roleType
+ * Check if feedback exists for a milestone and role
+ */
+router.get('/milestone/:milestoneId/:roleType', async (req, res) => {
+  try {
+    const { milestoneId, roleType } = req.params;
+
+    if (!['CLIENT_REVIEW', 'FREELANCER_REVIEW'].includes(roleType)) {
+      return res.status(400).json({ error: 'Invalid role type' });
+    }
+
+    const feedback = await prisma.feedback.findFirst({
+      where: {
+        milestoneId,
+        roleType
+      }
+    });
+
+    if (!feedback) {
+      return res.status(404).json({ error: 'Feedback not found' });
+    }
+
+    res.json(feedback);
+  } catch (error) {
+    console.error('Get milestone feedback error:', error);
     res.status(500).json({ error: error.message });
   }
 });

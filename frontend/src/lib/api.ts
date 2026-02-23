@@ -80,10 +80,16 @@ class ApiClient {
     });
   }
 
-  async submitMilestone(milestoneId: string, freelancerWallet: string, submissionHash: string, mode: string) {
+  async submitMilestone(milestoneId: string, freelancerWallet: string, submissionHash: string, mode: string, ipfsData?: any) {
     return this.request('/milestone/submit', {
       method: 'POST',
-      body: JSON.stringify({ milestoneId, freelancerWallet, submissionHash, mode }),
+      body: JSON.stringify({ 
+        milestoneId, 
+        freelancerWallet, 
+        submissionHash, 
+        mode,
+        ...ipfsData
+      }),
     });
   }
 
@@ -169,6 +175,16 @@ class ApiClient {
 
   async getUserReputation(walletAddress: string) {
     return this.request(`/user/${walletAddress}/reputation`);
+  }
+
+  // ===== ACTIVE USERS ENDPOINTS =====
+
+  async getActiveUsers() {
+    return this.request('/users/active');
+  }
+
+  async getNetworkStats() {
+    return this.request('/users/stats');
   }
 
   // ===== MODE-BASED ESCROW ENDPOINTS =====

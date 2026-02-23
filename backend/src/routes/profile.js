@@ -7,7 +7,7 @@ const prisma = getDatabase();
 
 /**
  * GET /profile/:wallet
- * Get user profile with stats
+ * Get user profile with complete transaction history and real stats
  */
 router.get('/:wallet', async (req, res) => {
   try {
@@ -29,49 +29,144 @@ router.get('/:wallet', async (req, res) => {
       });
     }
 
-    // Get milestone stats
+    // Get all escrows where user is freelancer
+    const freelancerEscrows = await prisma.escrow.findMany({
+      where: { freelancerWallet: wallet }
+    });
+
+    const freelancerEscrowIds = freelancerEscrows.map(e => e.id);
+
+    // Get all APPROVED milestones for these escrows
+    const freelancerMilestones = await prisma.milestone.findMany({
+      where: {
+        escrowId: { in: freelancerEscrowIds },
+        status: 'APPROVED'
+      },
+      orderBy: { approvedAt: 'desc' }
+    });
+
+    // Attach escrow data to milestones
+    const freelancerMilestonesWithEscrow = freelancerMilestones.map(m => ({
+      ...m,
+      escrow: freelancerEscrows.find(e => e.id === m.escrowId)
+    }));
+
+    // Calculate total earnings
+    const totalEarnings = freelancerMilestones.reduce((sum, m) => sum + m.amount, 0);
+
+    // Get all escrows where user is client
+    const clientEscrows = await prisma.escrow.findMany({
+      where: { clientWallet: wallet }
+    });
+
+    const clientEscrowIds = clientEscrows.map(e => e.id);
+
+    // Get all APPROVED milestones for these escrows
+    const clientMilestones = await prisma.milestone.findMany({
+      where: {
+        escrowId: { in: clientEscrowIds },
+        status: 'APPROVED'
+      },
+      orderBy: { approvedAt: 'desc' }
+    });
+
+    // Attach escrow data to milestones
+    const clientMilestonesWithEscrow = clientMilestones.map(m => ({
+      ...m,
+      escrow: clientEscrows.find(e => e.id === m.escrowId)
+    }));
+
+    // Calculate total spending
+    const totalSpending = clientMilestones.reduce((sum, m) => sum + m.amount, 0);
+
+    // Get all milestones created by client (all statuses)
     const milestonesCreated = await prisma.milestone.count({
       where: {
-        escrow: {
-          clientWallet: wallet
-        }
+        escrowId: { in: clientEscrowIds }
       }
     });
 
-    const milestonesCompleted = await prisma.milestone.count({
-      where: {
-        escrow: {
-          freelancerWallet: wallet
-        },
-        status: 'APPROVED'
-      }
-    });
+    // Get completed milestones as freelancer
+    const milestonesCompleted = freelancerMilestones.length;
 
-    // Get reviews
+    // Get reviews received
     const reviews = await prisma.feedback.findMany({
       where: { reviewedWallet: wallet },
-      orderBy: { createdAt: 'desc' },
-      take: 5
+      orderBy: { createdAt: 'desc' }
     });
+
+    // Get reviewer info for each review
+    const reviewsWithInfo = await Promise.all(
+      reviews.map(async (review) => {
+        const reviewer = await prisma.user.findUnique({
+          where: { walletAddress: review.reviewerWallet }
+        });
+
+        return {
+          ...review,
+          reviewer: {
+            walletAddress: review.reviewerWallet,
+            username: reviewer?.username || null,
+            role: reviewer?.role || 'CLIENT'
+          }
+        };
+      })
+    );
 
     // Calculate average rating
-    const allReviews = await prisma.feedback.findMany({
-      where: { reviewedWallet: wallet }
-    });
-
-    const avgRating = allReviews.length > 0
-      ? allReviews.reduce((sum, r) => sum + r.rating, 0) / allReviews.length
+    const avgRating = reviews.length > 0
+      ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length
       : 5.0;
+
+    // Build transaction history - show BOTH client and freelancer transactions
+    const allTransactions = [
+      // Freelancer transactions (earnings)
+      ...freelancerMilestonesWithEscrow.map(m => ({
+        milestoneId: m.id,
+        description: m.description,
+        amount: m.amount,
+        otherParty: m.escrow?.clientWallet || 'Unknown',
+        otherPartyLabel: 'Client',
+        fundingTxHash: m.fundingTxHash,
+        approvalTxHash: m.approvalTxHash,
+        submissionCid: m.submissionCid,
+        submissionUrl: m.submissionUrl,
+        approvedAt: m.approvedAt,
+        type: 'EARNING'
+      })),
+      // Client transactions (spending)
+      ...clientMilestonesWithEscrow.map(m => ({
+        milestoneId: m.id,
+        description: m.description,
+        amount: m.amount,
+        otherParty: m.escrow?.freelancerWallet || 'Unknown',
+        otherPartyLabel: 'Freelancer',
+        fundingTxHash: m.fundingTxHash,
+        approvalTxHash: m.approvalTxHash,
+        submissionCid: m.submissionCid,
+        submissionUrl: m.submissionUrl,
+        approvedAt: m.approvedAt,
+        type: 'SPENDING'
+      }))
+    ].sort((a, b) => {
+      // Sort by date, most recent first
+      const dateA = a.approvedAt ? new Date(a.approvedAt).getTime() : 0;
+      const dateB = b.approvedAt ? new Date(b.approvedAt).getTime() : 0;
+      return dateB - dateA;
+    });
 
     res.json({
       ...user,
       stats: {
+        totalEarnings,
+        totalSpending,
         milestonesCreated,
         milestonesCompleted,
-        averageRating: avgRating.toFixed(1),
-        totalReviews: allReviews.length
+        averageRating: parseFloat(avgRating.toFixed(1)),
+        totalReviews: reviews.length
       },
-      recentReviews: reviews
+      transactionHistory: allTransactions,
+      reviews: reviewsWithInfo
     });
   } catch (error) {
     console.error('Get profile error:', error);

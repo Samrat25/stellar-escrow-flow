@@ -48,6 +48,26 @@ export const StellarWalletProvider = ({ children }: { children: ReactNode }) => 
                         setAddress(walletAddress);
                         localStorage.setItem('walletAddress', walletAddress);
                         localStorage.setItem('selectedWallet', option.id);
+                        
+                        // Auto-create profile if doesn't exist
+                        try {
+                            const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/profile/${walletAddress}`);
+                            if (!response.ok) {
+                                // Profile doesn't exist, create it
+                                await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/profile/update`, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                        walletAddress,
+                                        username: `User${walletAddress.slice(0, 6)}`,
+                                        role: 'CLIENT'
+                                    })
+                                });
+                            }
+                        } catch (error) {
+                            console.error('Profile creation error:', error);
+                        }
+                        
                         toast.success("Wallet connected!", {
                             description: `${walletAddress.slice(0, 8)}...${walletAddress.slice(-4)}`
                         });
