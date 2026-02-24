@@ -108,6 +108,10 @@ Production-hardened dApp with smart contract security, IPFS integration, dual fe
 ![Active Users](docs/screenshots/users.png)  
 *Active users with dynamic role computation*
 
+#### Milestone Created
+![Milestone Funded](docs/screenshots/createmilestone.png.png)  
+*Milestone successfully created with XLM*
+
 #### Milestone Funded
 ![Milestone Funded](docs/screenshots/Funded.png)  
 *Milestone successfully funded with XLM locked in contract*
