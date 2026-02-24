@@ -91,38 +91,54 @@ Production-hardened dApp with smart contract security, IPFS integration, dual fe
 `CBJNQEIZ2CGPI4TRGVGMGKA7UYWNMUB2WJ3JVXW4IFHVHOW3Y4KV6JWL`  
 🔍 [Verify on Stellar Explorer](https://stellar.expert/explorer/testnet/contract/CBJNQEIZ2CGPI4TRGVGMGKA7UYWNMUB2WJ3JVXW4IFHVHOW3Y4KV6JWL)
 
-### 📸 Required Screenshots
+### 📸 Application Screenshots
 
 <details>
-<summary>Click to view screenshots</summary>
+<summary>Click to view all 11 screenshots</summary>
 
 #### Landing Page
-![Landing Page](docs/screenshots/landing.png)  
+![Landing Page](docs/screenshots/Landing.png)  
 *Modern landing page with active users and latest reviews*
 
-#### Create Milestone
-![Create Milestone](docs/screenshots/create-milestone.png)  
-*Intuitive milestone creation interface*
+#### User Profile
+![User Profile](docs/screenshots/profile.png)  
+*User profile with statistics and reputation*
+
+#### Active Users
+![Active Users](docs/screenshots/users.png)  
+*Active users with dynamic role computation*
+
+#### Milestone Funded
+![Milestone Funded](docs/screenshots/Funded.png)  
+*Milestone successfully funded with XLM locked in contract*
 
 #### IPFS Upload
-![IPFS Upload](docs/screenshots/ipfs-upload.png)  
+![IPFS Upload](docs/screenshots/ipfs.png)  
 *Three upload options: file, text, or existing CID*
 
-#### Client Review
-![Client Review](docs/screenshots/client-review.png)  
-*Client viewing submitted work with IPFS link*
+#### Upload Work
+![Upload Work](docs/screenshots/uploadwork.png)  
+*Freelancer submitting work with IPFS integration*
 
-#### Dashboard
-![Dashboard](docs/screenshots/dashboard.png)  
-*Comprehensive dashboard with all milestones*
+#### Feedback System
+![Feedback](docs/screenshots/feedback.png)  
+*Dual review system for mutual feedback*
 
-#### Dual Reviews
-![Reviews](docs/screenshots/reviews.png)  
-*Mutual review system for trust building*
+#### Reviews Display
+![Reviews](docs/screenshots/review.png)  
+*Public reviews displayed on landing page*
 
-#### Mobile Responsive View
-![Mobile View](docs/screenshots/mobile.png)  
-*Fully responsive design optimized for all devices*
+#### Smart Contract Deployment
+![Contract Deployment](docs/screenshots/deploycontract.png)  
+*Smart contract deployed on Stellar Testnet*
+
+#### Contract Verification
+![Contract](docs/screenshots/contract.png)  
+*Contract verified on Stellar Explorer*
+
+#### Database Schema
+![Database](docs/screenshots/database.png)  
+*Supabase database with all tables configured*
 
 </details>
 
