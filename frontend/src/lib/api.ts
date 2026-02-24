@@ -1,13 +1,14 @@
 import { CreateEscrowRequest, CreateEscrowResponse, Escrow } from '@/types/escrow';
 
 // Use placeholder during build, real URL at runtime
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://placeholder-api.example.com';
+const API_BASE_URL = (import.meta.env.VITE_API_URL || 'https://placeholder-api.example.com').replace(/\/$/, '');
 
 class ApiClient {
   private baseUrl: string;
 
   constructor(baseUrl: string) {
-    this.baseUrl = baseUrl;
+    // Remove trailing slash if present
+    this.baseUrl = baseUrl.replace(/\/$/, '');
   }
 
   private async request<T>(endpoint: string, options?: RequestInit): Promise<T> {
