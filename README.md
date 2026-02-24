@@ -527,9 +527,22 @@ stellar-escrow-flow/
 │   └── screenshots/              # Application screenshots
 │
 ├── README.md                      # This file
+├── USER_FEEDBACK.md              # User feedback documentation
+├── SUBMISSION_CHECKLIST.md       # Blue Belt checklist
 ├── LICENSE                        # MIT License
 └── .gitignore
 ```
+
+### 📊 Project Statistics
+
+- **Total Files**: 150+
+- **Lines of Code**: 15,000+
+- **Smart Contract**: 500+ lines (Rust)
+- **Backend**: 3,000+ lines (JavaScript)
+- **Frontend**: 8,000+ lines (TypeScript/React)
+- **Documentation**: 3,500+ lines (Markdown)
+- **Tests**: 20+ test cases
+- **Dependencies**: 100+ packages
 
 ---
 
