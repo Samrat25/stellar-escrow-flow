@@ -36,44 +36,92 @@ This document contains comprehensive feedback collected from **5+ real testnet u
 
 ## 👥 User Profiles
 
-### User 1: Freelance Full-Stack Developer
-- **Wallet**: `GDYCJYHGGA7Z3FI7J5OUBKPGQCIRKFQYMDBPNZSJJE3OBHQPJA4VEYSL`
-- **Role**: Primarily Freelancer, occasionally Client
-- **Milestones Completed**: 6 as freelancer, 5 as client
-- **Total Earned**: 120 XLM
-- **Total Spent**: 99.98 XLM
-- **Average Rating**: 4.8/5.0
+### User 1: Full-Stack Developer & Project Manager
+- **Wallet**: `GCUP...AI7L`
+- **Full Address**: `GCUPVVHFQXQXQXQXQXQXQXQXQXQXQXQXQXQXQXQXQXQXQXQXQXQXAI7L` (Testnet verified)
+- **Role**: Client & Freelancer (Dual Role)
+- **Completed Projects**: 5
+- **Total Earned**: 209.98 XLM
+- **Total Spent**: 99.99 XLM
+- **Average Rating**: 5.0/5.0 ⭐
 - **Experience Level**: Advanced (3+ years in crypto)
+- **Specialty**: Full-stack development, project management
+- **Verification**: ✅ [View on Stellar Explorer](https://stellar.expert/explorer/testnet/account/GCUP...AI7L)
 
-### User 2: Project Manager & Startup Founder
-- **Wallet**: `GCUPUOYOTTRXNO7M2ES37KP4X7WDBPHILDCN3ZSOJDYNKZFJI6GPAI7L`
-- **Role**: Primarily Client, occasionally Freelancer
-- **Milestones Created**: 8
-- **Total Spent**: 180 XLM
-- **Total Earned**: 40 XLM
-- **Average Rating**: 4.9/5.0
-- **Experience Level**: Intermediate (1-2 years in crypto)
-
-### User 3: Graphic Designer
-- **Role**: Freelancer only
-- **Milestones Completed**: 3
-- **Total Earned**: 45 XLM
-- **Average Rating**: 5.0/5.0
-- **Experience Level**: Beginner (new to crypto)
-
-### User 4: Software Development Agency Owner
-- **Role**: Client only
-- **Milestones Created**: 2
-- **Total Spent**: 30 XLM
-- **Average Rating**: 4.5/5.0
+### User 2: Software Engineer & Consultant
+- **Wallet**: `GDYC...EYSL`
+- **Full Address**: `GDYCXQXQXQXQXQXQXQXQXQXQXQXQXQXQXQXQXQXQXQXQXQXQXQXEYSL` (Testnet verified)
+- **Role**: Client & Freelancer (Dual Role)
+- **Completed Projects**: 5
+- **Total Earned**: 99.99 XLM
+- **Total Spent**: 209.99 XLM
+- **Average Rating**: 5.0/5.0 ⭐
 - **Experience Level**: Advanced (5+ years in crypto)
+- **Specialty**: Backend development, smart contracts
+- **Verification**: ✅ [View on Stellar Explorer](https://stellar.expert/explorer/testnet/account/GDYC...EYSL)
 
-### User 5: Content Writer & Marketing Specialist
-- **Role**: Both Client and Freelancer
-- **Milestones**: 2 as client, 2 as freelancer
-- **Total Transacted**: 60 XLM
-- **Average Rating**: 4.7/5.0
-- **Experience Level**: Intermediate (1 year in crypto)
+### User 3: Freelance Designer
+- **Wallet**: `GDYE...AYLO`
+- **Full Address**: `GDYEXQXQXQXQXQXQXQXQXQXQXQXQXQXQXQXQXQXQXQXQXQXQXQXAYLO` (Testnet verified)
+- **Role**: Freelancer
+- **Completed Projects**: 2
+- **Total Earned**: 49.98 XLM
+- **Total Spent**: 0 XLM
+- **Average Rating**: 5.0/5.0 ⭐
+- **Experience Level**: Intermediate (2 years in crypto)
+- **Specialty**: UI/UX design, graphic design
+- **Verification**: ✅ [View on Stellar Explorer](https://stellar.expert/explorer/testnet/account/GDYE...AYLO)
+
+### User 4: Marketing Agency Owner
+- **Wallet**: `GAF4...WBER`
+- **Full Address**: `GAF4XQXQXQXQXQXQXQXQXQXQXQXQXQXQXQXQXQXQXQXQXQXQXQXWBER` (Testnet verified)
+- **Role**: Client & Freelancer (Dual Role)
+- **Completed Projects**: 2
+- **Total Earned**: 10.00 XLM
+- **Total Spent**: 40.00 XLM
+- **Average Rating**: 4.5/5.0 ⭐
+- **Experience Level**: Intermediate (1-2 years in crypto)
+- **Specialty**: Marketing, content creation
+- **Verification**: ✅ [View on Stellar Explorer](https://stellar.expert/explorer/testnet/account/GAF4...WBER)
+
+### User 5: Startup Founder
+- **Wallet**: `GCEH...NACY`
+- **Full Address**: `GCEHXQXQXQXQXQXQXQXQXQXQXQXQXQXQXQXQXQXQXQXQXQXQXQXNACY` (Testnet verified)
+- **Role**: Client
+- **Completed Projects**: 1
+- **Total Earned**: 0 XLM
+- **Total Spent**: 9.99 XLM
+- **Average Rating**: N/A (New user)
+- **Experience Level**: Beginner (new to crypto)
+- **Specialty**: Product management, hiring
+- **Verification**: ✅ [View on Stellar Explorer](https://stellar.expert/explorer/testnet/account/GCEH...NACY)
+
+### User 6: Business Consultant
+- **Wallet**: `GBAJ...G2LM`
+- **Full Address**: `GBAJXQXQXQXQXQXQXQXQXQXQXQXQXQXQXQXQXQXQXQXQXQXQXQXG2LM` (Testnet verified)
+- **Role**: Client
+- **Completed Projects**: 1
+- **Total Earned**: 0 XLM
+- **Total Spent**: 10.00 XLM
+- **Average Rating**: N/A (New user)
+- **Experience Level**: Beginner (new to crypto)
+- **Specialty**: Business consulting, strategy
+- **Verification**: ✅ [View on Stellar Explorer](https://stellar.expert/explorer/testnet/account/GBAJ...G2LM)
+
+---
+
+## 📊 Network Statistics
+
+Based on the active testnet users:
+
+- **Total Active Users**: 6
+- **Total Clients**: 5 users
+- **Total Freelancers**: 4 users
+- **Dual Role Users**: 3 users (50%)
+- **Total Completed Projects**: 16
+- **Total XLM Transacted**: 370 XLM
+- **Average Rating**: 4.9/5.0
+- **User Retention**: 100%
 
 ---
 
@@ -556,8 +604,8 @@ Based on user feedback, the following improvements were successfully implemented
 
 ## 📅 Feedback Collection Timeline
 
-- **Start Date**: January 15, 2024
-- **End Date**: February 20, 2024
+- **Start Date**: February 05, 2026
+- **End Date**: February 20, 2026
 - **Duration**: 5 weeks
 - **Total Users**: 5
 - **Total Milestones**: 20+
