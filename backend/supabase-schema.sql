@@ -1,12 +1,24 @@
--- Create tables for Stellar Escrow Platform
--- Generated from Prisma schema
+-- ============================================================================
+-- Stellar Escrow Flow - Complete Database Schema
+-- ============================================================================
+-- This is the complete, up-to-date schema for the Stellar Escrow Flow platform
+-- Run this in Supabase SQL Editor to create all tables, indexes, and triggers
+--
+-- Features:
+-- - Role-agnostic user system (no static role column)
+-- - IPFS integration for work submissions
+-- - Dual review system (client & freelancer feedback)
+-- - Smart contract transaction tracking
+-- - Automatic timestamp updates
+--
+-- Last Updated: February 24, 2026
+-- ============================================================================
 
 -- User table with profile information
 CREATE TABLE IF NOT EXISTS "User" (
   "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   "walletAddress" TEXT UNIQUE NOT NULL,
   "username" TEXT,
-  "role" TEXT DEFAULT 'CLIENT',
   "bio" TEXT,
   "avatarUrl" TEXT,
   "reputation" DOUBLE PRECISION DEFAULT 5.0,
@@ -58,6 +70,10 @@ CREATE TABLE IF NOT EXISTS "Milestone" (
   "approvalTxHash" TEXT,
   "rejectionTxHash" TEXT,
   "rejectionReason" TEXT,
+  "submissionCid" TEXT,
+  "submissionUrl" TEXT,
+  "submissionFilename" TEXT,
+  "submissionSize" INTEGER,
   "createdAt" TIMESTAMP DEFAULT NOW(),
   "updatedAt" TIMESTAMP DEFAULT NOW(),
   FOREIGN KEY ("escrowId") REFERENCES "Escrow"("id") ON DELETE CASCADE,
@@ -131,6 +147,7 @@ CREATE INDEX IF NOT EXISTS "idx_escrow_freelancer" ON "Escrow"("freelancerWallet
 CREATE INDEX IF NOT EXISTS "idx_escrow_status" ON "Escrow"("status");
 CREATE INDEX IF NOT EXISTS "idx_milestone_escrow" ON "Milestone"("escrowId");
 CREATE INDEX IF NOT EXISTS "idx_milestone_status" ON "Milestone"("status");
+CREATE INDEX IF NOT EXISTS "idx_milestone_submission_cid" ON "Milestone"("submissionCid");
 CREATE INDEX IF NOT EXISTS "idx_transaction_escrow" ON "TransactionLog"("escrowId");
 CREATE INDEX IF NOT EXISTS "idx_transaction_wallet" ON "TransactionLog"("walletAddress");
 CREATE INDEX IF NOT EXISTS "idx_feedback_milestone" ON "Feedback"("milestoneId");
@@ -166,3 +183,25 @@ CREATE TRIGGER update_agentlog_updated_at BEFORE UPDATE ON "AgentLog"
 
 CREATE TRIGGER update_iterationplan_updated_at BEFORE UPDATE ON "IterationPlan"
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- ============================================================================
+-- Schema Complete
+-- ============================================================================
+-- All tables, indexes, and triggers have been created
+-- 
+-- Key Features Included:
+-- ✅ User table (role-agnostic - no static role column)
+-- ✅ Escrow table (smart contract tracking)
+-- ✅ Milestone table (with IPFS fields: submissionCid, submissionUrl, submissionFilename, submissionSize)
+-- ✅ Feedback table (dual review system)
+-- ✅ TransactionLog table (blockchain transaction tracking)
+-- ✅ AgentLog table (automated agent actions)
+-- ✅ IterationPlan table (user feedback tracking)
+-- ✅ All indexes for performance optimization
+-- ✅ Automatic timestamp update triggers
+--
+-- Next Steps:
+-- 1. Verify all tables were created: SELECT tablename FROM pg_tables WHERE schemaname = 'public';
+-- 2. Check User table has no 'role' column: SELECT column_name FROM information_schema.columns WHERE table_name = 'User';
+-- 3. Verify IPFS fields exist: SELECT column_name FROM information_schema.columns WHERE table_name = 'Milestone' AND column_name LIKE 'submission%';
+-- ============================================================================

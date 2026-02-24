@@ -2,7 +2,7 @@ import express from 'express';
 import { getDatabase } from '../config/database.js';
 
 const router = express.Router();
-const prisma = getDatabase();
+const db = getDatabase();
 
 /**
  * GET /users/active
@@ -11,63 +11,67 @@ const prisma = getDatabase();
  */
 router.get('/active', async (req, res) => {
   try {
-    // Query to get active users with computed metrics
-    const activeUsers = await prisma.$queryRaw`
-      SELECT 
-        u."walletAddress",
-        u."username",
-        u."createdAt",
-        u."bio",
-        u."avatarUrl",
-        
-        -- Client activity count
-        COUNT(DISTINCT CASE WHEN e."clientWallet" = u."walletAddress" THEN e."id" END)::int as "timesAsClient",
-        
-        -- Freelancer activity count
-        COUNT(DISTINCT CASE WHEN e."freelancerWallet" = u."walletAddress" THEN e."id" END)::int as "timesAsFreelancer",
-        
-        -- Total milestones (as client or freelancer)
-        COUNT(DISTINCT CASE WHEN e."clientWallet" = u."walletAddress" OR e."freelancerWallet" = u."walletAddress" THEN m."id" END)::int as "totalMilestones",
-        
-        -- Completed milestones (APPROVED status)
-        COUNT(DISTINCT CASE 
-          WHEN (e."clientWallet" = u."walletAddress" OR e."freelancerWallet" = u."walletAddress") 
-          AND m."status" = 'APPROVED' 
-          THEN m."id" 
-        END)::int as "completedMilestones",
-        
-        -- Total earned (as freelancer, APPROVED milestones only)
-        COALESCE(SUM(CASE 
-          WHEN e."freelancerWallet" = u."walletAddress" AND m."status" = 'APPROVED' 
-          THEN m."amount" 
-        END), 0)::float as "totalEarned",
-        
-        -- Total spent (as client, APPROVED milestones only)
-        COALESCE(SUM(CASE 
-          WHEN e."clientWallet" = u."walletAddress" AND m."status" = 'APPROVED' 
-          THEN m."amount" 
-        END), 0)::float as "totalSpent",
-        
-        -- Average rating (from feedback received)
-        COALESCE(AVG(f."rating"), 0)::float as "averageRating",
-        
-        -- Feedback count
-        COUNT(DISTINCT f."id")::int as "feedbackCount"
+    // Get all users
+    const users = await db.user.findMany();
 
-      FROM "User" u
-      LEFT JOIN "Escrow" e ON (e."clientWallet" = u."walletAddress" OR e."freelancerWallet" = u."walletAddress")
-      LEFT JOIN "Milestone" m ON m."escrowId" = e."id"
-      LEFT JOIN "Feedback" f ON f."reviewedWallet" = u."walletAddress"
+    // Get all escrows
+    const escrows = await db.escrow.findMany();
 
-      GROUP BY u."walletAddress", u."username", u."createdAt", u."bio", u."avatarUrl"
+    // Get all milestones
+    const milestones = await db.milestone.findMany();
 
-      HAVING 
-        COUNT(DISTINCT CASE WHEN e."clientWallet" = u."walletAddress" THEN e."id" END) > 0
-        OR COUNT(DISTINCT CASE WHEN e."freelancerWallet" = u."walletAddress" THEN e."id" END) > 0
-        OR COUNT(DISTINCT f."id") > 0
+    // Get all feedback
+    const feedbacks = await db.feedback.findMany();
 
-      ORDER BY "totalMilestones" DESC, "completedMilestones" DESC
-    `;
+    // Compute metrics for each user
+    const activeUsers = users.map(user => {
+      const userEscrows = escrows.filter(e => 
+        e.clientWallet === user.walletAddress || e.freelancerWallet === user.walletAddress
+      );
+
+      const timesAsClient = escrows.filter(e => e.clientWallet === user.walletAddress).length;
+      const timesAsFreelancer = escrows.filter(e => e.freelancerWallet === user.walletAddress).length;
+
+      const userMilestones = milestones.filter(m => 
+        userEscrows.some(e => e.id === m.escrowId)
+      );
+
+      const completedMilestones = userMilestones.filter(m => m.status === 'APPROVED').length;
+
+      const totalEarned = milestones
+        .filter(m => {
+          const escrow = escrows.find(e => e.id === m.escrowId);
+          return escrow && escrow.freelancerWallet === user.walletAddress && m.status === 'APPROVED';
+        })
+        .reduce((sum, m) => sum + m.amount, 0);
+
+      const totalSpent = milestones
+        .filter(m => {
+          const escrow = escrows.find(e => e.id === m.escrowId);
+          return escrow && escrow.clientWallet === user.walletAddress && m.status === 'APPROVED';
+        })
+        .reduce((sum, m) => sum + m.amount, 0);
+
+      const userFeedbacks = feedbacks.filter(f => f.reviewedWallet === user.walletAddress);
+      const averageRating = userFeedbacks.length > 0
+        ? userFeedbacks.reduce((sum, f) => sum + f.rating, 0) / userFeedbacks.length
+        : 0;
+
+      return {
+        walletAddress: user.walletAddress,
+        username: user.username,
+        timesAsClient,
+        timesAsFreelancer,
+        totalMilestones: userMilestones.length,
+        completedMilestones,
+        totalEarned,
+        totalSpent,
+        averageRating: parseFloat(averageRating.toFixed(1)),
+        feedbackCount: userFeedbacks.length
+      };
+    }).filter(user => 
+      user.timesAsClient > 0 || user.timesAsFreelancer > 0 || user.feedbackCount > 0
+    ).sort((a, b) => b.totalMilestones - a.totalMilestones);
 
     // Compute network stats
     const networkStats = {
@@ -94,20 +98,24 @@ router.get('/active', async (req, res) => {
  */
 router.get('/stats', async (req, res) => {
   try {
-    const stats = await prisma.$queryRaw`
-      SELECT 
-        COUNT(DISTINCT u."walletAddress")::int as "totalUsers",
-        COUNT(DISTINCT CASE WHEN e."clientWallet" IS NOT NULL THEN e."clientWallet" END)::int as "totalClients",
-        COUNT(DISTINCT CASE WHEN e."freelancerWallet" IS NOT NULL THEN e."freelancerWallet" END)::int as "totalFreelancers",
-        COUNT(DISTINCT e."id")::int as "totalEscrows",
-        COUNT(DISTINCT CASE WHEN m."status" = 'APPROVED' THEN m."id" END)::int as "completedMilestones",
-        COALESCE(SUM(CASE WHEN m."status" = 'APPROVED' THEN m."amount" END), 0)::float as "totalXlmReleased"
-      FROM "User" u
-      LEFT JOIN "Escrow" e ON (e."clientWallet" = u."walletAddress" OR e."freelancerWallet" = u."walletAddress")
-      LEFT JOIN "Milestone" m ON m."escrowId" = e."id"
-    `;
+    const users = await db.user.findMany();
+    const escrows = await db.escrow.findMany();
+    const milestones = await db.milestone.findMany();
 
-    res.json(stats[0]);
+    const completedMilestones = milestones.filter(m => m.status === 'APPROVED');
+    const totalXlmReleased = completedMilestones.reduce((sum, m) => sum + m.amount, 0);
+
+    const uniqueClients = new Set(escrows.map(e => e.clientWallet)).size;
+    const uniqueFreelancers = new Set(escrows.map(e => e.freelancerWallet)).size;
+
+    res.json({
+      totalUsers: users.length,
+      totalClients: uniqueClients,
+      totalFreelancers: uniqueFreelancers,
+      totalEscrows: escrows.length,
+      completedMilestones: completedMilestones.length,
+      totalXlmReleased
+    });
   } catch (error) {
     console.error('Get stats error:', error);
     res.status(500).json({ error: error.message });

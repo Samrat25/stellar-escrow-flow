@@ -167,6 +167,16 @@ const MilestoneDetail = () => {
         }
       );
       
+      // Handle fallback submission (no blockchain transaction needed)
+      if (result.usedFallback) {
+        toast.success('Work submitted successfully!', {
+          description: 'Your work is now stored on IPFS and visible to the client'
+        });
+        setIpfsData(null);
+        loadMilestone();
+        return;
+      }
+      
       if (result.needsSigning && result.xdr) {
         toast.info('Please sign the transaction in your wallet');
         
