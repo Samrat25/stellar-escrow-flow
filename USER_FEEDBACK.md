@@ -606,12 +606,12 @@ Based on user feedback, the following improvements were successfully implemented
 
 - **Start Date**: February 05, 2026
 - **End Date**: February 20, 2026
-- **Duration**: 5 weeks
+- **Duration**: 15 Days
 - **Total Users**: 5
 - **Total Milestones**: 20+
 - **Total Transactions**: 50+
 - **Total Feedback Items**: 35+
-- **Iteration 1 Completion**: February 24, 2024
+- **Iteration 1 Completion**: February 24, 2026
 
 ---
 
