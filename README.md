@@ -83,7 +83,7 @@ Production-hardened dApp with smart contract security, IPFS integration, dual fe
 **Live Demo Link**  
 🚀 **Deployed Application**: [https://stellar-escrow-flow.vercel.app](https://stellar-escrow-flow.vercel.app)
 
-**🎥 Demo Video**: [Watch on YouTube](#) *(Link to be added)*
+**🎥 Demo Video**: [Watch on YouTube](https://youtu.be/BK15qkZyVqo) 
 
 ### Contract Addresses & Transaction Hash
 
@@ -114,7 +114,7 @@ All users verified on Stellar Testnet with real transactions:
 ### 📸 Application Screenshots
 
 <details>
-<summary>Click to view all 11 screenshots</summary>
+<summary>Click to view all 12 screenshots</summary>
 
 #### Landing Page
 ![Landing Page](docs/screenshots/Landing.png)  
