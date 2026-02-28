@@ -13,20 +13,48 @@ router.get('/:wallet', async (req, res) => {
   try {
     const { wallet } = req.params;
 
+    // Validate wallet address format
+    if (!wallet || !/^G[A-Z2-7]{55}$/.test(wallet)) {
+      return res.status(400).json({ error: 'Invalid wallet address format' });
+    }
+
     // Get or create user
     let user = await prisma.user.findUnique({
       where: { walletAddress: wallet }
+    }).catch(err => {
+      console.error('Database query error:', err);
+      return null;
     });
 
     if (!user) {
       // Auto-create profile on first access
-      user = await prisma.user.create({
-        data: {
+      try {
+        user = await prisma.user.create({
+          data: {
+            walletAddress: wallet,
+            role: 'CLIENT',
+            reputation: 5.0
+          }
+        });
+      } catch (createError) {
+        console.error('Error creating user:', createError);
+        // Return minimal profile if database fails
+        return res.json({
           walletAddress: wallet,
           role: 'CLIENT',
-          reputation: 5.0
-        }
-      });
+          reputation: 5.0,
+          stats: {
+            totalEarnings: 0,
+            totalSpending: 0,
+            milestonesCreated: 0,
+            milestonesCompleted: 0,
+            averageRating: 5.0,
+            totalReviews: 0
+          },
+          transactionHistory: [],
+          reviews: []
+        });
+      }
     }
 
     // Get all escrows where user is freelancer

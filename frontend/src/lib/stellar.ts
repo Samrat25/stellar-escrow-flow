@@ -43,14 +43,34 @@ export const formatXLM = (amount: number): string => {
 
 export const getWalletBalance = async (address: string): Promise<number> => {
   try {
-    const response = await fetch(`${TESTNET_HORIZON}/accounts/${address}`);
-    if (!response.ok) return 0;
+    // Add timeout to prevent hanging requests
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+    
+    const response = await fetch(`${TESTNET_HORIZON}/accounts/${address}`, {
+      signal: controller.signal
+    });
+    
+    clearTimeout(timeoutId);
+    
+    if (!response.ok) {
+      console.warn(`Failed to fetch balance: ${response.status}`);
+      return 0;
+    }
     
     const account = await response.json();
     const xlmBalance = account.balances.find((b: any) => b.asset_type === 'native');
     return xlmBalance ? parseFloat(xlmBalance.balance) : 0;
   } catch (error) {
-    console.error('Error fetching balance:', error);
+    // Silently handle network errors - don't spam console
+    if (error instanceof Error) {
+      if (error.name === 'AbortError') {
+        console.warn('Balance fetch timeout - network may be slow');
+      } else if (error.message.includes('Failed to fetch')) {
+        // Network disconnected - this is expected, don't log
+        return 0;
+      }
+    }
     return 0;
   }
 };

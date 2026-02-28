@@ -24,23 +24,37 @@ const Navbar = () => {
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [balance, setBalance] = useState<number | null>(null);
+  const [balanceError, setBalanceError] = useState(false);
   const { address, connect, disconnect } = useStellarWallet();
   const { mode, toggleMode } = useMode();
 
   useEffect(() => {
     if (address) {
       loadBalance();
-      const interval = setInterval(loadBalance, 10000); // Refresh every 10s
+      // Only refresh if not in error state
+      const interval = setInterval(() => {
+        if (!balanceError) {
+          loadBalance();
+        }
+      }, 15000); // Refresh every 15s (reduced from 10s)
       return () => clearInterval(interval);
     } else {
       setBalance(null);
+      setBalanceError(false);
     }
-  }, [address]);
+  }, [address, balanceError]);
 
   const loadBalance = async () => {
     if (!address) return;
-    const bal = await getWalletBalance(address);
-    setBalance(bal);
+    try {
+      const bal = await getWalletBalance(address);
+      setBalance(bal);
+      setBalanceError(false);
+    } catch (error) {
+      // Set error state to prevent excessive retries
+      setBalanceError(true);
+      console.warn('Balance fetch failed, will retry in 15s');
+    }
   };
 
   return (
