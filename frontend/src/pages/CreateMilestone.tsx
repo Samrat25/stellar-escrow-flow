@@ -128,7 +128,17 @@ const CreateMilestone = () => {
           description: 'Now you can fund it to lock XLM in the contract'
         });
         
-        navigate('/dashboard');
+        // Navigate to the milestone detail page
+        const milestoneId = createResult.milestone?.id || createResult.escrow?.milestones?.[0]?.id;
+        if (milestoneId) {
+          navigate(`/milestone/${milestoneId}`);
+        } else {
+          navigate('/dashboard');
+        }
+      } else if (createResult.milestone?.id) {
+        // If fallback was used, navigate to milestone detail
+        toast.success('Milestone created!');
+        navigate(`/milestone/${createResult.milestone.id}`);
       } else {
         toast.success('Milestone created!');
         navigate('/dashboard');
