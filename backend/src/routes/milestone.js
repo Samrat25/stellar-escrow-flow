@@ -21,11 +21,14 @@ dotenv.config();
 const router = express.Router();
 const prisma = getDatabase();
 
-// Direct Supabase client for bypassing adapter issues
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY
-);
+// Direct Supabase client for bypassing adapter issues (only if configured)
+let supabase = null;
+if (process.env.SUPABASE_URL && (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY)) {
+  supabase = createClient(
+    process.env.SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY
+  );
+}
 
 /**
  * POST /milestone/create
@@ -258,7 +261,7 @@ router.post('/complete-creation', verifyMode, requireBuyingMode, logAccess('COMP
       totalAmount: parseFloat(amount),
       status: 'CREATED',
       reviewWindowDays: 7,
-      deadline: deadlineDate.toISOString(), // Convert to ISO string
+      deadline: deadlineDate,
       creationTxHash: sanitizedTxHash
     };
 
@@ -268,23 +271,15 @@ router.post('/complete-creation', verifyMode, requireBuyingMode, logAccess('COMP
       deadlineType: typeof escrowData.deadline
     });
 
-    // Try direct Supabase insert to bypass adapter
-    console.log('Attempting direct Supabase insert...');
-    const { data: escrowResult, error: escrowError } = await supabase
-      .from('Escrow')
-      .insert([escrowData])
-      .select()
-      .single();
+    // Create escrow using prisma (works with both Supabase and in-memory)
+    console.log('Creating escrow...');
+    const escrow = await prisma.escrow.create({
+      data: escrowData
+    });
 
-    if (escrowError) {
-      console.error('Supabase escrow insert error:', escrowError);
-      throw new Error(`Failed to create escrow: ${escrowError.message}`);
-    }
-
-    const escrow = escrowResult;
     console.log('Escrow created successfully:', escrow.id);
 
-    // Create milestone record using direct Supabase
+    // Create milestone record using prisma
     const milestoneData = {
       escrowId: escrow.id,
       milestoneIndex: 0,
@@ -295,18 +290,10 @@ router.post('/complete-creation', verifyMode, requireBuyingMode, logAccess('COMP
     };
 
     console.log('Creating milestone...');
-    const { data: milestoneResult, error: milestoneError } = await supabase
-      .from('Milestone')
-      .insert([milestoneData])
-      .select()
-      .single();
+    const milestone = await prisma.milestone.create({
+      data: milestoneData
+    });
 
-    if (milestoneError) {
-      console.error('Supabase milestone insert error:', milestoneError);
-      throw new Error(`Failed to create milestone: ${milestoneError.message}`);
-    }
-
-    const milestone = milestoneResult;
     console.log('Milestone created successfully:', milestone.id);
 
     res.json({
@@ -689,22 +676,15 @@ router.post('/complete-approval', logAccess('COMPLETE_APPROVAL'), async (req, re
 
     console.log('Completing approval for milestone:', milestoneId);
 
-    // Update milestone using direct Supabase
-    const { data: updatedMilestone, error: updateError } = await supabase
-      .from('Milestone')
-      .update({
+    // Update milestone using prisma (works with both Supabase and in-memory)
+    const updatedMilestone = await prisma.milestone.update({
+      where: { id: milestoneId },
+      data: {
         status: 'APPROVED',
-        approvedAt: new Date().toISOString(),
+        approvedAt: new Date(),
         approvalTxHash: txHash
-      })
-      .eq('id', milestoneId)
-      .select()
-      .single();
-
-    if (updateError) {
-      console.error('Failed to update milestone:', updateError);
-      throw new Error(`Failed to update milestone: ${updateError.message}`);
-    }
+      }
+    });
 
     console.log('Milestone approved successfully:', milestoneId);
 
