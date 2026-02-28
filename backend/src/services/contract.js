@@ -106,15 +106,50 @@ export class ContractService {
   }
 
   async createMilestoneMock(clientWallet, freelancerWallet, amount) {
-    const mockTxHash = this.generateMockTxHash();
-    const mockEscrowId = `escrow-${Date.now()}`;
+    try {
+      // Create a real Stellar payment transaction for milestone creation
+      // This creates a 0.0000001 XLM payment as a "marker" transaction
+      const account = await horizonServer.loadAccount(clientWallet);
+      
+      const transaction = new StellarSDK.TransactionBuilder(account, {
+        fee: StellarSDK.BASE_FEE,
+        networkPassphrase: NETWORK_PASSPHRASE,
+      })
+        .addOperation(
+          StellarSDK.Operation.payment({
+            destination: freelancerWallet,
+            asset: StellarSDK.Asset.native(),
+            amount: '0.0000001', // Minimal amount as marker
+          })
+        )
+        .addMemo(StellarSDK.Memo.text(`ESCROW_CREATE:${amount}XLM`))
+        .setTimeout(180)
+        .build();
 
-    return {
-      success: true,
-      txHash: mockTxHash,
-      escrowId: mockEscrowId,
-      explorerUrl: `https://stellar.expert/explorer/testnet/tx/${mockTxHash}`
-    };
+      const xdr = transaction.toXDR();
+      const mockEscrowId = `escrow-${Date.now()}`;
+
+      return {
+        success: true,
+        needsSigning: true,
+        xdr: xdr,
+        contractId: this.contractId,
+        escrowId: mockEscrowId,
+        message: 'Transaction ready for signing (mock mode with real Stellar transaction)'
+      };
+    } catch (error) {
+      console.error('Mock milestone creation error:', error);
+      // Fallback to pure mock if account doesn't exist
+      const mockTxHash = this.generateMockTxHash();
+      const mockEscrowId = `escrow-${Date.now()}`;
+
+      return {
+        success: true,
+        txHash: mockTxHash,
+        escrowId: mockEscrowId,
+        explorerUrl: `https://stellar.expert/explorer/testnet/tx/${mockTxHash}`
+      };
+    }
   }
 
   /**
@@ -170,14 +205,50 @@ export class ContractService {
   }
 
   async fundMilestoneMock(clientWallet, amount) {
-    const mockTxHash = this.generateMockTxHash();
-    
-    return {
-      success: true,
-      txHash: mockTxHash,
-      amount,
-      explorerUrl: `https://stellar.expert/explorer/testnet/tx/${mockTxHash}`
-    };
+    try {
+      // Create a real Stellar payment transaction for funding
+      const account = await horizonServer.loadAccount(clientWallet);
+      
+      // For funding, we create a payment to a temporary escrow address
+      // In production, this would be the contract address
+      const escrowAddress = 'GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF'; // Null address as placeholder
+      
+      const transaction = new StellarSDK.TransactionBuilder(account, {
+        fee: StellarSDK.BASE_FEE,
+        networkPassphrase: NETWORK_PASSPHRASE,
+      })
+        .addOperation(
+          StellarSDK.Operation.payment({
+            destination: escrowAddress,
+            asset: StellarSDK.Asset.native(),
+            amount: amount.toString(),
+          })
+        )
+        .addMemo(StellarSDK.Memo.text(`ESCROW_FUND:${amount}XLM`))
+        .setTimeout(180)
+        .build();
+
+      const xdr = transaction.toXDR();
+
+      return {
+        success: true,
+        needsSigning: true,
+        xdr: xdr,
+        amount,
+        message: 'Transaction ready for signing (mock mode with real Stellar transaction)'
+      };
+    } catch (error) {
+      console.error('Mock fund milestone error:', error);
+      // Fallback to pure mock
+      const mockTxHash = this.generateMockTxHash();
+      
+      return {
+        success: true,
+        txHash: mockTxHash,
+        amount,
+        explorerUrl: `https://stellar.expert/explorer/testnet/tx/${mockTxHash}`
+      };
+    }
   }
 
   /**
@@ -280,6 +351,8 @@ export class ContractService {
   }
 
   async submitMilestoneMock(milestoneIndex) {
+    // For submission, we just record it in the database
+    // No on-chain transaction needed for work submission
     const mockTxHash = this.generateMockTxHash();
     
     return {
@@ -287,7 +360,8 @@ export class ContractService {
       txHash: mockTxHash,
       milestoneIndex,
       submittedAt: new Date().toISOString(),
-      explorerUrl: `https://stellar.expert/explorer/testnet/tx/${mockTxHash}`
+      explorerUrl: `https://stellar.expert/explorer/testnet/tx/${mockTxHash}`,
+      message: 'Work submitted (recorded in database, IPFS CID stored)'
     };
   }
 
@@ -350,6 +424,8 @@ export class ContractService {
   }
 
   async approveMilestoneMock(milestoneIndex) {
+    // For approval, we don't create a real transaction in mock mode
+    // The actual payment would happen through the smart contract
     const mockTxHash = this.generateMockTxHash();
     
     return {
@@ -357,7 +433,8 @@ export class ContractService {
       txHash: mockTxHash,
       milestoneIndex,
       approvedAt: new Date().toISOString(),
-      explorerUrl: `https://stellar.expert/explorer/testnet/tx/${mockTxHash}`
+      explorerUrl: `https://stellar.expert/explorer/testnet/tx/${mockTxHash}`,
+      message: 'Milestone approved (in production, XLM would be released from contract to freelancer)'
     };
   }
 
