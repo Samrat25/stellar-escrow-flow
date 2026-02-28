@@ -427,8 +427,9 @@ router.post('/submit', verifyMode, requireSellingMode, verifyFreelancerAssignmen
     // Milestone and assignment already verified by middleware
     const milestone = req.milestone;
 
-    if (milestone.status !== 'FUNDED') {
-      return res.status(400).json({ error: 'Milestone must be funded first' });
+    // Allow submission if milestone is PENDING or FUNDED (relaxed for demo)
+    if (milestone.status !== 'FUNDED' && milestone.status !== 'PENDING') {
+      return res.status(400).json({ error: `Cannot submit work - milestone status is ${milestone.status}` });
     }
 
     // Validate IPFS CID if provided

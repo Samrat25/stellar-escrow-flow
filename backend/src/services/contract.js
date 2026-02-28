@@ -206,40 +206,19 @@ export class ContractService {
 
   async fundMilestoneMock(clientWallet, amount) {
     try {
-      // Create a real Stellar payment transaction for funding
-      const account = await horizonServer.loadAccount(clientWallet);
+      // For mock mode, we'll just mark it as funded without actual payment
+      // This allows the workflow to continue
+      const mockTxHash = this.generateMockTxHash();
       
-      // For funding, we create a payment to a temporary escrow address
-      // In production, this would be the contract address
-      const escrowAddress = 'GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF'; // Null address as placeholder
-      
-      const transaction = new StellarSDK.TransactionBuilder(account, {
-        fee: StellarSDK.BASE_FEE,
-        networkPassphrase: NETWORK_PASSPHRASE,
-      })
-        .addOperation(
-          StellarSDK.Operation.payment({
-            destination: escrowAddress,
-            asset: StellarSDK.Asset.native(),
-            amount: amount.toString(),
-          })
-        )
-        .addMemo(StellarSDK.Memo.text(`ESCROW_FUND:${amount}XLM`))
-        .setTimeout(180)
-        .build();
-
-      const xdr = transaction.toXDR();
-
       return {
         success: true,
-        needsSigning: true,
-        xdr: xdr,
+        txHash: mockTxHash,
         amount,
-        message: 'Transaction ready for signing (mock mode with real Stellar transaction)'
+        explorerUrl: `https://stellar.expert/explorer/testnet/tx/${mockTxHash}`,
+        message: `Milestone marked as funded with ${amount} XLM (mock mode - no actual transfer)`
       };
     } catch (error) {
       console.error('Mock fund milestone error:', error);
-      // Fallback to pure mock
       const mockTxHash = this.generateMockTxHash();
       
       return {
