@@ -166,23 +166,64 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Add triggers for updated_at
+DROP TRIGGER IF EXISTS update_user_updated_at ON "User";
 CREATE TRIGGER update_user_updated_at BEFORE UPDATE ON "User"
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_escrow_updated_at ON "Escrow";
 CREATE TRIGGER update_escrow_updated_at BEFORE UPDATE ON "Escrow"
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_milestone_updated_at ON "Milestone";
 CREATE TRIGGER update_milestone_updated_at BEFORE UPDATE ON "Milestone"
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_feedback_updated_at ON "Feedback";
 CREATE TRIGGER update_feedback_updated_at BEFORE UPDATE ON "Feedback"
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_agentlog_updated_at ON "AgentLog";
 CREATE TRIGGER update_agentlog_updated_at BEFORE UPDATE ON "AgentLog"
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_iterationplan_updated_at ON "IterationPlan";
 CREATE TRIGGER update_iterationplan_updated_at BEFORE UPDATE ON "IterationPlan"
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- API Request Metrics table for monitoring
+CREATE TABLE IF NOT EXISTS "ApiMetric" (
+  "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  "path" TEXT NOT NULL,
+  "method" TEXT NOT NULL,
+  "statusCode" INTEGER NOT NULL,
+  "responseTime" DOUBLE PRECISION NOT NULL,
+  "timestamp" TIMESTAMP DEFAULT NOW()
+);
+
+-- Daily Active Users tracking
+CREATE TABLE IF NOT EXISTS "DailyActiveUser" (
+  "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  "walletAddress" TEXT NOT NULL,
+  "date" DATE NOT NULL,
+  "createdAt" TIMESTAMP DEFAULT NOW(),
+  UNIQUE ("walletAddress", "date")
+);
+
+-- Indexed Events table
+CREATE TABLE IF NOT EXISTS "IndexedEvent" (
+  "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  "txHash" TEXT UNIQUE NOT NULL,
+  "eventType" TEXT NOT NULL,
+  "contractId" TEXT NOT NULL,
+  "data" JSONB,
+  "ledgerSequence" BIGINT,
+  "createdAt" TIMESTAMP DEFAULT NOW()
+);
+
+-- Create indexes
+CREATE INDEX IF NOT EXISTS "idx_apimetric_timestamp" ON "ApiMetric"("timestamp");
+CREATE INDEX IF NOT EXISTS "idx_dau_date" ON "DailyActiveUser"("date");
+CREATE INDEX IF NOT EXISTS "idx_indexedevent_contract" ON "IndexedEvent"("contractId");
 
 -- ============================================================================
 -- Schema Complete

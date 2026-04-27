@@ -66,6 +66,7 @@ function createSupabaseAdapter(supabase) {
   };
   
   return {
+    $supabase: supabase,
     escrow: {
       findUnique: async ({ where, include }) => {
         let query = supabase.from('Escrow').select('*');
@@ -535,6 +536,48 @@ function createSupabaseAdapter(supabase) {
         if (error) throw new Error(error.message);
         return data;
       }
+    },
+
+    apiMetric: {
+      findMany: async (query) => {
+        let supabaseQuery = supabase.from('ApiMetric').select('*');
+        
+        if (query?.orderBy) {
+          const key = Object.keys(query.orderBy)[0];
+          const direction = query.orderBy[key] === 'desc' ? { ascending: false } : { ascending: true };
+          supabaseQuery = supabaseQuery.order(key, direction);
+        }
+        
+        if (query?.take) {
+          supabaseQuery = supabaseQuery.limit(query.take);
+        }
+        
+        const { data, error } = await supabaseQuery;
+        return data || [];
+      },
+      
+      create: async ({ data: metricData }) => {
+        const { data, error } = await supabase
+          .from('ApiMetric')
+          .insert(metricData)
+          .select()
+          .single();
+        
+        if (error) {
+          console.error('ApiMetric insert error:', error.message);
+          return null;
+        }
+        return data;
+      }
+    },
+
+    indexedEvent: {
+      count: async () => {
+        const { count } = await supabase
+          .from('IndexedEvent')
+          .select('*', { count: 'exact', head: true });
+        return count || 0;
+      }
     }
   };
 }
@@ -547,7 +590,10 @@ function createInMemoryDatabase() {
     user: [],
     agentLog: [],
     iterationPlan: [],
-    transactionLog: []
+    transactionLog: [],
+    apiMetric: [],
+    dailyActiveUser: [],
+    indexedEvent: []
   };
 
   const generateId = () => Math.random().toString(36).substr(2, 9);
@@ -762,6 +808,51 @@ function createInMemoryDatabase() {
         data.transactionLog.push(l);
         return l;
       })
+    },
+
+    apiMetric: {
+      findMany: (query) => Promise.resolve(
+        data.apiMetric
+          .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+          .slice(0, query?.take || 50)
+      ),
+      create: ({ data: metricData }) => Promise.resolve({
+        ...metricData,
+        id: generateId(),
+        timestamp: new Date()
+      }).then(m => {
+        data.apiMetric.push(m);
+        return m;
+      })
+    },
+
+    dailyActiveUser: {
+      create: ({ data: dauData }) => Promise.resolve({
+        ...dauData,
+        id: generateId()
+      }).then(d => {
+        data.dailyActiveUser.push(d);
+        return d;
+      })
+    },
+
+    indexedEvent: {
+      findFirst: (query) => Promise.resolve(
+        data.indexedEvent.length > 0 ? data.indexedEvent[data.indexedEvent.length - 1] : null
+      ),
+      upsert: ({ where, create, update }) => {
+        const existing = data.indexedEvent.find(e => e.txHash === where.txHash);
+        if (existing) return Promise.resolve(existing);
+        return Promise.resolve({
+          ...create,
+          id: generateId(),
+          createdAt: new Date()
+        }).then(e => {
+          data.indexedEvent.push(e);
+          return e;
+        });
+      },
+      count: () => Promise.resolve(data.indexedEvent.length)
     }
   };
 }

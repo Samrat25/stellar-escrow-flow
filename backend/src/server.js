@@ -10,6 +10,9 @@ import usersActiveRoutes from './routes/users-active.js';
 import agentRoutes from './routes/agent.js';
 import profileRoutes from './routes/profile.js';
 import ipfsRoutes from './routes/ipfs.js';
+import metricsRoutes from './routes/metrics.js';
+import monitoringMiddleware from './middleware/monitoring.js';
+import { indexerService } from './services/indexer.js';
 
 dotenv.config();
 initializeDatabase();
@@ -19,6 +22,9 @@ const PORT = process.env.PORT || 3001;
 
 app.use(cors());
 app.use(express.json());
+
+// Monitoring Middleware (must be before routes)
+app.use(monitoringMiddleware);
 
 app.use((req, res, next) => {
   console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
@@ -46,6 +52,7 @@ app.use('/users', usersActiveRoutes);
 app.use('/agent', agentRoutes);
 app.use('/profile', profileRoutes);
 app.use('/ipfs', ipfsRoutes);
+app.use('/metrics', metricsRoutes);
 
 /**
  * Error handling middleware
@@ -70,4 +77,7 @@ app.listen(PORT, () => {
   console.log(`📡 Network: ${process.env.STELLAR_NETWORK || 'testnet'}`);
   console.log(`🔗 Horizon: ${process.env.STELLAR_HORIZON_URL}`);
   console.log(`📦 Database: ${process.env.DATABASE_URL ? 'PostgreSQL' : 'SQLite (dev)'}`);
+  
+  // Start the background indexer service
+  indexerService.init();
 });

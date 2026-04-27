@@ -11,6 +11,8 @@ import MilestoneDetail from "./pages/MilestoneDetail";
 import Profile from "./pages/Profile";
 import FeedbackClient from "./pages/FeedbackClient";
 import FeedbackFreelancer from "./pages/FeedbackFreelancer";
+import MetricsDashboard from "./pages/MetricsDashboard";
+import Monitoring from "./pages/Monitoring";
 import NotFound from "./pages/NotFound";
 import { useStellarWallet } from './contexts/WalletContext';
 
@@ -40,6 +42,8 @@ const App = () => {
             <Route path="/profile/:wallet" element={<Profile />} />
             <Route path="/feedback/client" element={<FeedbackClient />} />
             <Route path="/feedback/freelancer" element={<FeedbackFreelancer />} />
+            <Route path="/metrics" element={<MetricsDashboard />} />
+            <Route path="/monitoring" element={<Monitoring />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

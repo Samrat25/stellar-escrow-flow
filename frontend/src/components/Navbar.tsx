@@ -18,6 +18,8 @@ import { Badge } from '@/components/ui/badge';
 const navItems = [
   { label: 'Dashboard', path: '/dashboard' },
   { label: 'Create Milestone', path: '/create-milestone' },
+  { label: 'Metrics', path: '/metrics' },
+  { label: 'Monitoring', path: '/monitoring' },
 ];
 
 const Navbar = () => {

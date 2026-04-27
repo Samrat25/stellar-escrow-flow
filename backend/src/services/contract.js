@@ -22,7 +22,7 @@ const horizonServer = new StellarSDK.Horizon.Server(HORIZON_URL);
 export class ContractService {
   constructor(contractId = CONTRACT_ID) {
     this.contractId = contractId;
-    this.useRealContract = USE_REAL_CONTRACT && contractId;
+    this.useRealContract = USE_REAL_CONTRACT && contractId && !contractId.startsWith('contract-') && !contractId.startsWith('mock');
   }
 
   /**
@@ -133,7 +133,7 @@ export class ContractService {
         success: true,
         needsSigning: true,
         xdr: xdr,
-        contractId: this.contractId,
+        contractId: this.contractId || this.generateMockContractId(),
         escrowId: mockEscrowId,
         message: 'Transaction ready for signing (mock mode with real Stellar transaction)'
       };
@@ -147,6 +147,7 @@ export class ContractService {
         success: true,
         txHash: mockTxHash,
         escrowId: mockEscrowId,
+        contractId: this.contractId || this.generateMockContractId(),
         explorerUrl: `https://stellar.expert/explorer/testnet/tx/${mockTxHash}`
       };
     }

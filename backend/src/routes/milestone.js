@@ -856,4 +856,35 @@ router.get('/:id', async (req, res) => {
   }
 });
 
+/**
+ * POST /milestone/sponsor-transaction
+ * Takes a signed inner transaction and wraps it in a fee bump
+ */
+router.post('/sponsor-transaction', async (req, res) => {
+  try {
+    const { signedTxXdr } = req.body;
+    if (!signedTxXdr) {
+      return res.status(400).json({ error: 'Signed transaction XDR is required' });
+    }
+
+    const { sponsorService } = await import('../services/sponsor.js');
+    
+    if (!sponsorService.isActive) {
+      return res.status(400).json({ error: 'Fee sponsorship is not active on this server' });
+    }
+
+    const result = await sponsorService.sponsorTransaction(signedTxXdr);
+    
+    res.json({
+      success: true,
+      txHash: result.hash,
+      status: result.status,
+      message: 'Transaction sponsored successfully'
+    });
+  } catch (error) {
+    console.error('Sponsor transaction error:', error);
+    res.status(500).json({ error: error.message || 'Failed to sponsor transaction' });
+  }
+});
+
 export default router;

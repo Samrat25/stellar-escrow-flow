@@ -220,6 +220,25 @@ class ApiClient {
     return this.request('/agent/test', { method: 'POST' });
   }
 
+  // ===== METRICS & MONITORING ENDPOINTS =====
+
+  async getDashboardMetrics() {
+    return this.request('/metrics/dashboard');
+  }
+
+  async getSystemStatus() {
+    return this.request('/metrics/system-status');
+  }
+
+  // ===== FEE SPONSORSHIP =====
+
+  async sponsorTransaction(signedTxXdr: string) {
+    return this.request('/milestone/sponsor-transaction', {
+      method: 'POST',
+      body: JSON.stringify({ signedTxXdr }),
+    });
+  }
+
   // ===== HEALTH CHECK =====
 
   async healthCheck() {
