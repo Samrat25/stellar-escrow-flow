@@ -15,8 +15,7 @@ A production-ready escrow platform built on Stellar's Soroban smart contracts wi
 | Requirement | Status | Evidence |
 |-------------|--------|----------|
 | **30+ verified active users** | ✅ COMPLETE | [User Data Spreadsheet](https://docs.google.com/spreadsheets/d/1oBcl8eR00MFmLPxT0s72M9s00KW7Bsey/edit) - 30 users with wallet addresses |
-| **Metrics dashboard live** | ✅ COMPLETE | [Live Dashboard](https://stellar-escrow-flow.vercel.app/metrics) - DAU, transactions, retention tracking |
-| **Monitoring active** | ✅ COMPLETE | [System Status](https://stellar-escrow-flow.vercel.app/metrics/dashboard) - API health & performance |
+| **Monitoring active** | ✅ COMPLETE | [System Status](https://stellar-escrow-flow-backend.onrender.com/metrics/dashboard) - API health & performance |
 | **Data indexing implemented** | ✅ COMPLETE | Background service syncing contract events - 38+ events indexed |
 | **Full documentation** | ✅ COMPLETE | README, API docs, architecture, deployment guide, user feedback |
 | **Community contribution** | ✅ COMPLETE | Twitter post sharing project with Stellar community (link below) |
