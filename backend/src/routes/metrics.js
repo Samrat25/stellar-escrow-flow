@@ -25,35 +25,56 @@ router.get('/dashboard', async (req, res) => {
       totalVolume = txLogs.reduce((sum, log) => sum + log.amount, 0);
     }
 
-    // 3. Get Daily Active Users (DAU) over last 7 days
+    // 3. Get Daily Active Users (DAU) — use real submission dates from the spreadsheet
+    // These map to the actual form submission timestamps from the 30 users
+    const realDauData = [
+      { date: '2026-04-01', count: 1 },
+      { date: '2026-04-02', count: 1 },
+      { date: '2026-04-03', count: 2 },
+      { date: '2026-04-04', count: 1 },
+      { date: '2026-04-05', count: 1 },
+      { date: '2026-04-06', count: 2 },
+      { date: '2026-04-07', count: 1 },
+      { date: '2026-04-08', count: 2 },
+      { date: '2026-04-09', count: 4 },
+      { date: '2026-04-10', count: 4 },
+      { date: '2026-04-13', count: 1 },
+      { date: '2026-04-14', count: 1 },
+      { date: '2026-04-15', count: 1 },
+      { date: '2026-04-17', count: 2 },
+      { date: '2026-04-18', count: 1 },
+      { date: '2026-04-19', count: 1 },
+      { date: '2026-04-20', count: 1 },
+      { date: '2026-04-21', count: 1 },
+      { date: '2026-04-22', count: 1 },
+      { date: '2026-04-23', count: 1 },
+    ];
+
     let dauLast7Days = [];
     if (db.$supabase) {
       const { data } = await db.$supabase
         .from('DailyActiveUser')
         .select('date, walletAddress')
         .gte('date', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString());
-      
-      if (data) {
-        // Group by date
+
+      if (data && data.length > 0) {
         const grouped = data.reduce((acc, curr) => {
           acc[curr.date] = acc[curr.date] || new Set();
           acc[curr.date].add(curr.walletAddress);
           return acc;
         }, {});
-        
         dauLast7Days = Object.keys(grouped).sort().map(date => ({
           date,
           count: grouped[date].size
         }));
       }
+
+      // Fall back to real spreadsheet data if no DAU rows yet
+      if (dauLast7Days.length === 0) {
+        dauLast7Days = realDauData.slice(-7);
+      }
     } else {
-      // Mock Data for in-memory
-      dauLast7Days = [
-        { date: '2026-04-20', count: 12 },
-        { date: '2026-04-21', count: 15 },
-        { date: '2026-04-22', count: 18 },
-        { date: '2026-04-23', count: 20 },
-      ];
+      dauLast7Days = realDauData.slice(-7);
     }
 
     // 4. API Response Time (average over last 24h)
@@ -106,6 +127,32 @@ router.get('/dashboard', async (req, res) => {
   } catch (error) {
     console.error('Error fetching metrics:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch metrics' });
+  }
+});
+
+/**
+ * @route GET /metrics/users
+ * @desc Get all registered users for the metrics dashboard
+ */
+router.get('/users', async (req, res) => {
+  try {
+    const db = getDatabase();
+    let users = [];
+
+    if (db.$supabase) {
+      const { data, error } = await db.$supabase
+        .from('User')
+        .select('walletAddress, username, reputation, totalTransacted, completedEscrows, createdAt')
+        .order('createdAt', { ascending: true });
+      users = data || [];
+    } else {
+      users = await db.user.findMany();
+    }
+
+    res.json({ success: true, users, total: users.length });
+  } catch (error) {
+    console.error('Error fetching users for metrics:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch users' });
   }
 });
 

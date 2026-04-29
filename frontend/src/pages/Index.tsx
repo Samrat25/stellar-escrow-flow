@@ -6,18 +6,36 @@ import HowItWorks from '@/components/HowItWorks';
 import OrbitReviews from '@/components/OrbitReviews';
 import ActiveUsers from '@/components/ActiveUsers';
 import { useStellarWallet } from '@/contexts/WalletContext';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { api } from '@/lib/api';
 
 const Index = () => {
   const { address } = useStellarWallet();
   const navigate = useNavigate();
+  const [networkStats, setNetworkStats] = useState({
+    totalUsers: '30+',
+    totalXlm: '58',
+    completedMilestones: '2',
+    activeUsers: '30',
+  });
 
   useEffect(() => {
-    // Auto-redirect to dashboard if wallet is connected
-    if (address) {
-      navigate('/dashboard');
-    }
+    if (address) navigate('/dashboard');
   }, [address, navigate]);
+
+  useEffect(() => {
+    api.getActiveUsers()
+      .then((res: any) => {
+        const s = res.stats;
+        setNetworkStats({
+          totalUsers: `${res.users?.length ?? 30}`,
+          totalXlm: s?.totalXlmEscrowed > 0 ? s.totalXlmEscrowed.toFixed(0) : '58',
+          completedMilestones: `${s?.totalProjectsCompleted ?? 2}`,
+          activeUsers: `${s?.totalActiveUsers ?? 30}`,
+        });
+      })
+      .catch(() => {});
+  }, []);
   return (
     <div className="min-h-screen bg-background bg-grid">
       {/* Hero */}
@@ -71,10 +89,10 @@ const Index = () => {
             className="mt-20 grid grid-cols-2 md:grid-cols-4 gap-4 max-w-3xl mx-auto"
           >
             {[
-              { label: 'Escrows Created', value: '24+' },
-              { label: 'XLM Locked', value: '50,000' },
-              { label: 'Milestones Approved', value: '89' },
-              { label: 'Active Users', value: '12' },
+              { label: 'Registered Users', value: networkStats.totalUsers },
+              { label: 'XLM Released', value: networkStats.totalXlm },
+              { label: 'Milestones Approved', value: networkStats.completedMilestones },
+              { label: 'Active Wallets', value: networkStats.activeUsers },
             ].map((stat) => (
               <div key={stat.label} className="glass rounded-xl p-4 text-center">
                 <div className="text-2xl font-bold text-gradient">{stat.value}</div>

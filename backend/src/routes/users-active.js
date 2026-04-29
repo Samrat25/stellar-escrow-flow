@@ -23,7 +23,7 @@ router.get('/active', async (req, res) => {
     // Get all feedback
     const feedbacks = await db.feedback.findMany();
 
-    // Compute metrics for each user
+    // Compute metrics for each user — include ALL users (even those without escrows yet)
     const activeUsers = users.map(user => {
       const userEscrows = escrows.filter(e => 
         e.clientWallet === user.walletAddress || e.freelancerWallet === user.walletAddress
@@ -69,16 +69,23 @@ router.get('/active', async (req, res) => {
         averageRating: parseFloat(averageRating.toFixed(1)),
         feedbackCount: userFeedbacks.length
       };
-    }).filter(user => 
-      user.timesAsClient > 0 || user.timesAsFreelancer > 0 || user.feedbackCount > 0
-    ).sort((a, b) => b.totalMilestones - a.totalMilestones);
+    }).filter(user =>
+      // Show all users — those with activity first, then the rest
+      true
+    ).sort((a, b) => {
+      // Sort: users with activity first, then by wallet address for stable order
+      const aActive = a.timesAsClient + a.timesAsFreelancer + a.feedbackCount;
+      const bActive = b.timesAsClient + b.timesAsFreelancer + b.feedbackCount;
+      if (bActive !== aActive) return bActive - aActive;
+      return b.totalMilestones - a.totalMilestones;
+    });
 
-    // Compute network stats
+    // Compute network stats — count all registered users
     const networkStats = {
       totalActiveUsers: activeUsers.length,
       totalUniqueClients: activeUsers.filter(u => u.timesAsClient > 0).length,
       totalUniqueFreelancers: activeUsers.filter(u => u.timesAsFreelancer > 0).length,
-      totalProjectsCompleted: activeUsers.reduce((sum, u) => sum + u.completedMilestones, 0),
+      totalProjectsCompleted: activeUsers.reduce((sum, u) => sum + u.completedMilestones, 0) / 2, // each approval counted once per side
       totalXlmEscrowed: activeUsers.reduce((sum, u) => sum + u.totalEarned, 0)
     };
 

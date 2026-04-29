@@ -86,77 +86,14 @@ router.post('/create', verifyMode, requireBuyingMode, logAccess('CREATE_MILESTON
       result = { success: false, error: contractError.message };
     }
 
-    // If contract fails, use fallback (direct database creation)
+    // If contract fails, surface the real error — no fake IDs
     if (!result.success) {
-      console.warn('Using fallback milestone creation');
-      
-      // Generate mock IDs
-      const mockContractId = `contract-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-      const mockEscrowId = `escrow-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-      const mockTxHash = `mock_create_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      
-      try {
-        // Create escrow and milestone directly in database
-        const escrow = await prisma.escrow.create({
-          data: {
-            contractId: mockContractId,
-            escrowIdOnChain: mockEscrowId,
-            clientWallet,
-            freelancerWallet,
-            totalAmount: parseFloat(amount),
-            status: 'CREATED',
-            reviewWindowDays: 7,
-            deadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-            creationTxHash: mockTxHash
-          }
-        });
-
-        const milestone = await prisma.milestone.create({
-          data: {
-            escrowId: escrow.id,
-            milestoneIndex: 0,
-            description: title || `Milestone for ${parseFloat(amount)} XLM`,
-            amount: parseFloat(amount),
-            status: 'PENDING',
-            creationTxHash: mockTxHash
-          }
-        });
-
-        return res.json({
-          success: true,
-          usedFallback: true,
-          escrow,
-          milestone,
-          mockTxHash,
-          message: 'Milestone created successfully (contract integration pending)'
-        });
-      } catch (dbError) {
-        console.error('Database error during fallback:', dbError);
-        
-        // If database also fails, return a minimal success response
-        // This allows the frontend to continue working
-        return res.json({
-          success: true,
-          usedFallback: true,
-          databasePending: true,
-          escrow: {
-            id: mockEscrowId,
-            contractId: mockContractId,
-            clientWallet,
-            freelancerWallet,
-            totalAmount: parseFloat(amount),
-            status: 'CREATED'
-          },
-          milestone: {
-            id: `milestone-${Date.now()}`,
-            description: title || `Milestone for ${parseFloat(amount)} XLM`,
-            amount: parseFloat(amount),
-            status: 'PENDING'
-          },
-          mockTxHash,
-          message: 'Milestone created (database sync pending - please refresh in a moment)'
-        });
-      }
+      console.error('Contract creation failed:', result.error);
+      return res.status(502).json({
+        error: 'Contract interaction failed',
+        detail: result.error,
+        hint: 'Ensure USE_REAL_CONTRACT=true and CONTRACT_ID is set correctly in .env',
+      });
     }
 
     // If needs signing, return XDR
@@ -451,35 +388,12 @@ router.post('/submit', verifyMode, requireSellingMode, verifyFreelancerAssignmen
       milestone.milestoneIndex
     );
 
-    // If contract fails, use fallback (direct database update)
+    // If contract call fails, surface the real error
     if (!result.success) {
-      console.warn('Contract submission failed, using fallback:', result.error);
-      
-      // Generate mock transaction hash
-      const mockTxHash = `mock_submit_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      
-      // Update milestone directly
-      await prisma.milestone.update({
-        where: { id: milestoneId },
-        data: {
-          status: 'SUBMITTED',
-          proofUrl: submissionUrl || submissionCid,
-          submittedAt: new Date(),
-          submissionTxHash: mockTxHash,
-          submissionCid,
-          submissionUrl,
-          submissionFilename,
-          submissionSize
-        }
-      });
-
-      return res.json({
-        success: true,
-        usedFallback: true,
-        mockTxHash,
-        submissionCid,
-        submissionUrl,
-        message: 'Work submitted successfully (contract integration pending)'
+      console.error('Contract submission failed:', result.error);
+      return res.status(502).json({
+        error: 'Contract submission failed',
+        detail: result.error,
       });
     }
 
@@ -598,22 +512,12 @@ router.post('/approve', verifyMode, requireBuyingMode, verifyClientOwnership, lo
       milestone.milestoneIndex
     );
 
-    // If contract call fails, use fallback (direct approval)
+    // If contract call fails, surface the real error
     if (!result.success) {
-      console.warn('Contract approval failed, using fallback approval');
-      
-      // Generate a mock transaction hash for tracking
-      const mockTxHash = `mock-approval-${Date.now()}-${Math.random().toString(36).substring(7)}`;
-      
-      return res.json({
-        success: true,
-        needsSigning: false,
-        usedFallback: true,
-        mockTxHash,
-        milestoneId,
-        amount: milestone.amount,
-        freelancerWallet: milestone.escrow.freelancerWallet,
-        message: 'Approval completed (contract integration pending)'
+      console.error('Contract approval failed:', result.error);
+      return res.status(502).json({
+        error: 'Contract approval failed',
+        detail: result.error,
       });
     }
 
@@ -792,7 +696,7 @@ router.post('/refund', verifyMode, requireBuyingMode, verifyClientOwnership, log
 
     // Call contract to refund
     const contractService = new ContractService(milestone.escrow.contractId);
-    const result = await contractService.refundClient(milestone.milestoneIndex);
+    const result = await contractService.refundClientFor(clientWallet, milestone.milestoneIndex);
 
     if (!result.success) {
       return res.status(500).json({ error: result.error || 'Refund failed' });

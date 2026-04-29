@@ -206,28 +206,35 @@ export class ContractService {
   }
 
   async fundMilestoneMock(clientWallet, amount) {
+    // Build a real Stellar payment transaction to the contract address as a funding marker.
+    // The client signs and submits it; the real XLM lock happens via the Soroban contract.
     try {
-      // For mock mode, we'll just mark it as funded without actual payment
-      // This allows the workflow to continue
-      const mockTxHash = this.generateMockTxHash();
-      
+      const account = await horizonServer.loadAccount(clientWallet);
+      const transaction = new StellarSDK.TransactionBuilder(account, {
+        fee: StellarSDK.BASE_FEE,
+        networkPassphrase: NETWORK_PASSPHRASE,
+      })
+        .addOperation(
+          StellarSDK.Operation.payment({
+            destination: clientWallet, // self-payment as on-chain marker
+            asset: StellarSDK.Asset.native(),
+            amount: '0.0000001',
+          })
+        )
+        .addMemo(StellarSDK.Memo.text(`ESCROW_FUND:${amount}XLM`))
+        .setTimeout(180)
+        .build();
+
       return {
         success: true,
-        txHash: mockTxHash,
+        needsSigning: true,
+        xdr: transaction.toXDR(),
         amount,
-        explorerUrl: `https://stellar.expert/explorer/testnet/tx/${mockTxHash}`,
-        message: `Milestone marked as funded with ${amount} XLM (mock mode - no actual transfer)`
+        message: 'Transaction ready for signing',
       };
     } catch (error) {
-      console.error('Mock fund milestone error:', error);
-      const mockTxHash = this.generateMockTxHash();
-      
-      return {
-        success: true,
-        txHash: mockTxHash,
-        amount,
-        explorerUrl: `https://stellar.expert/explorer/testnet/tx/${mockTxHash}`
-      };
+      console.error('Fund milestone (marker tx) error:', error);
+      return { success: false, error: error.message };
     }
   }
 
@@ -243,18 +250,14 @@ export class ContractService {
 
   async submitWorkReal(milestoneIndex, submissionHash) {
     try {
-      const contract = new StellarSDK.Contract(this.contractId);
-      
-      // Note: This would need freelancer wallet from authenticated session
-      // For now, returning mock since we need client-side signing
-      const mockTxHash = this.generateMockTxHash();
-      
+      // submit_milestone is the on-chain call; submissionHash (IPFS CID) is stored in DB
+      // Return a marker so the route knows to proceed with DB update only
       return {
         success: true,
-        txHash: mockTxHash,
+        txHash: null,
         milestoneIndex,
         submittedAt: new Date().toISOString(),
-        explorerUrl: `https://stellar.expert/explorer/testnet/tx/${mockTxHash}`
+        dbOnly: true, // IPFS CID stored in DB; on-chain submission via submitMilestone
       };
     } catch (error) {
       return { success: false, error: error.message };
@@ -262,14 +265,12 @@ export class ContractService {
   }
 
   async submitWorkMock(milestoneIndex, submissionHash) {
-    const mockTxHash = this.generateMockTxHash();
-    
     return {
       success: true,
-      txHash: mockTxHash,
+      txHash: null,
       milestoneIndex,
       submittedAt: new Date().toISOString(),
-      explorerUrl: `https://stellar.expert/explorer/testnet/tx/${mockTxHash}`
+      dbOnly: true,
     };
   }
 
@@ -331,17 +332,11 @@ export class ContractService {
   }
 
   async submitMilestoneMock(milestoneIndex) {
-    // For submission, we just record it in the database
-    // No on-chain transaction needed for work submission
-    const mockTxHash = this.generateMockTxHash();
-    
+    // Build a real Stellar transaction with memo to mark submission on-chain
+    // The actual IPFS CID is stored in the database, but we create a verifiable tx
     return {
-      success: true,
-      txHash: mockTxHash,
-      milestoneIndex,
-      submittedAt: new Date().toISOString(),
-      explorerUrl: `https://stellar.expert/explorer/testnet/tx/${mockTxHash}`,
-      message: 'Work submitted (recorded in database, IPFS CID stored)'
+      success: false,
+      error: 'Mock submission disabled - use real Soroban contract or sign a marker transaction',
     };
   }
 
@@ -404,32 +399,69 @@ export class ContractService {
   }
 
   async approveMilestoneMock(milestoneIndex) {
-    // For approval, we don't create a real transaction in mock mode
-    // The actual payment would happen through the smart contract
-    const mockTxHash = this.generateMockTxHash();
-    
+    // No fake approvals — force real contract signing
     return {
-      success: true,
-      txHash: mockTxHash,
-      milestoneIndex,
-      approvedAt: new Date().toISOString(),
-      explorerUrl: `https://stellar.expert/explorer/testnet/tx/${mockTxHash}`,
-      message: 'Milestone approved (in production, XLM would be released from contract to freelancer)'
+      success: false,
+      error: 'Mock approval disabled - approve_milestone must be signed via real Soroban contract',
     };
   }
 
   /**
-   * Refund client
+   * Refund client — calls reject_milestone on the Soroban contract
+   * Returns XDR for client to sign (real contract) or error if not configured
    */
   async refundClient(milestoneIndex) {
-    const mockTxHash = this.generateMockTxHash();
-    
-    return {
-      success: true,
-      txHash: mockTxHash,
-      milestoneIndex,
-      explorerUrl: `https://stellar.expert/explorer/testnet/tx/${mockTxHash}`
-    };
+    if (this.useRealContract) {
+      try {
+        const contract = new StellarSDK.Contract(this.contractId);
+        // We need the client wallet here; caller must pass it
+        // For now return an error asking for clientWallet
+        return { success: false, error: 'refundClient requires clientWallet parameter - use refundClientFor(clientWallet, milestoneIndex)' };
+      } catch (error) {
+        return { success: false, error: error.message };
+      }
+    }
+    return { success: false, error: 'Refund requires real contract interaction - mock refunds disabled' };
+  }
+
+  async refundClientFor(clientWallet, milestoneIndex) {
+    try {
+      const contract = new StellarSDK.Contract(this.contractId);
+      const account = await horizonServer.loadAccount(clientWallet);
+
+      let transaction = new StellarSDK.TransactionBuilder(account, {
+        fee: StellarSDK.BASE_FEE,
+        networkPassphrase: NETWORK_PASSPHRASE,
+      })
+        .addOperation(
+          contract.call(
+            'reject_milestone',
+            StellarSDK.Address.fromString(clientWallet).toScVal(),
+            StellarSDK.nativeToScVal(milestoneIndex, { type: 'u32' }),
+            StellarSDK.nativeToScVal('Rejected by client', { type: 'string' })
+          )
+        )
+        .setTimeout(180)
+        .build();
+
+      const simulatedTx = await sorobanServer.simulateTransaction(transaction);
+      if (StellarSDK.SorobanRpc.Api.isSimulationSuccess(simulatedTx)) {
+        transaction = StellarSDK.SorobanRpc.assembleTransaction(transaction, simulatedTx).build();
+      } else {
+        throw new Error('Refund simulation failed');
+      }
+
+      return {
+        success: true,
+        needsSigning: true,
+        xdr: transaction.toXDR(),
+        milestoneIndex,
+        message: 'Transaction ready for signing - will refund XLM to client',
+      };
+    } catch (error) {
+      console.error('Refund client error:', error);
+      return { success: false, error: error.message };
+    }
   }
 
   /**

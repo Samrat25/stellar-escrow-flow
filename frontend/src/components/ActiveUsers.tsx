@@ -145,12 +145,12 @@ const ActiveUsers = () => {
               <Link to={`/profile/${user.walletAddress}`}>
                 <Card className="glass p-6 hover:border-primary/50 transition-all duration-300 hover:shadow-lg hover:shadow-primary/10 cursor-pointer h-full">
                   <div className="flex items-start justify-between mb-4">
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-lg mb-1">
-                        {user.username || shortenAddress(user.walletAddress)}
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-base mb-1 font-mono truncate">
+                        {user.walletAddress.slice(0, 8)}...{user.walletAddress.slice(-6)}
                       </h3>
-                      <p className="text-xs text-muted-foreground font-mono">
-                        {shortenAddress(user.walletAddress)}
+                      <p className="text-xs text-muted-foreground font-mono truncate">
+                        {user.walletAddress}
                       </p>
                     </div>
                     {getRoleBadge(user)}

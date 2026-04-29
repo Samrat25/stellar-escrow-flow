@@ -230,6 +230,10 @@ class ApiClient {
     return this.request('/metrics/system-status');
   }
 
+  async getMetricsUsers() {
+    return this.request('/metrics/users');
+  }
+
   // ===== FEE SPONSORSHIP =====
 
   async sponsorTransaction(signedTxXdr: string) {
