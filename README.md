@@ -32,38 +32,25 @@ A production-ready escrow platform built on Stellar's Soroban smart contracts wi
 
 **User Data:** [View Complete Spreadsheet](https://docs.google.com/spreadsheets/d/1oBcl8eR00MFmLPxT0s72M9s00KW7Bsey/edit)
 
-### 🌐 Community Contribution
-
-**Twitter/X Post:** [Share your Twitter post link here - Post about your product on Twitter as required]
-
-*Note: Please create a Twitter/X post about Stellar Escrow Flow including:*
-- Product description and key features
-- Live demo link
-- Smart contract verification link
-- Screenshots
-- Tag @StellarOrg and use #StellarBlockchain hashtag
-
----
-
 ## 🏛️ Architecture Overview
 
 ```
-┌──────────────────────────────────────────────────────────────────┐
-│                    FRONTEND (React + TypeScript)                 │
-│  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐            │
-│  │   Wallet     │ │  Milestone   │ │   Profile    │            │
-│  │   Selector   │ │  Manager     │ │   Dashboard  │            │
-│  └──────┬───────┘ └──────┬───────┘ └──────┬───────┘            │
-│         │                │                │                      │
-│         └────────────────┴────────────────┘                      │
-│                          │                                       │
+┌─────────────────────────────────────────────────────────────────┐
+│                    FRONTEND (React + TypeScript)                │
+│  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐             │
+│  │   Wallet     │ │  Milestone   │ │   Profile    │             │
+│  │   Selector   │ │  Manager     │ │   Dashboard  │             │
+│  └──────┬───────┘ └──────┬───────┘ └──────┬───────┘             │
+│         │                │                │                     │
+│         └────────────────┴────────────────┘                     │
+│                          │                                      │
 │              ┌───────────┴────────────┐                         │
 │              │  Stellar SDK + IPFS    │                         │
 │              └───────────┬────────────┘                         │
 └──────────────────────────┼──────────────────────────────────────┘
                            │ ← HTTPS/REST API + Soroban RPC
-┌──────────────────────────┼──────────────────────────────────────┐
-│                    BACKEND (Node.js + Express)                   │
+┌──────────────────────────┼─────────────────────────────────────┐
+│                    BACKEND (Node.js + Express)                 │
 │  ┌────────────────────┐     │     ┌────────────────────┐       │
 │  │   API Routes       │◄────┘     │  Business Logic    │       │
 │  │ • /escrow          │           │ • Contract Service │       │
@@ -76,11 +63,11 @@ A production-ready escrow platform built on Stellar's Soroban smart contracts wi
 │  ┌────────┴───────────┐  │  Supabase Service        │          │
 │  │  Stellar Service   │──│  (PostgreSQL + Adapter)  │          │
 │  │  (Soroban RPC)     │  └──────────────────────────┘          │
-│  └────────────────────┘                                         │
-└──────────────────────────────────────────────────────────────────┘
+│  └────────────────────┘                                        │
+└────────────────────────────────────────────────────────────────┘
                            │
 ┌──────────────────────────┼──────────────────────────────────────┐
-│                 SMART CONTRACTS (Soroban)                        │
+│                 SMART CONTRACTS (Soroban)                       │
 │  ┌─────────────────────────────────────────────────┐            │
 │  │ EscrowContract                                  │            │
 │  │ • create_milestone  — Create escrow agreement   │            │
@@ -89,22 +76,22 @@ A production-ready escrow platform built on Stellar's Soroban smart contracts wi
 │  │ • approve_milestone — Release payment           │            │
 │  │ • get_milestone     — Query milestone state     │            │
 │  └─────────────────────────────────────────────────┘            │
-└──────────────────────────────────────────────────────────────────┘
+└─────────────────────────────────────────────────────────────────┘
                            │
 ┌──────────────────────────┼──────────────────────────────────────┐
-│                      SUPABASE (PostgreSQL)                       │
-│  ┌────────────┐ ┌────────────┐ ┌────────────┐                 │
-│  │   User     │ │  Escrow    │ │ Milestone  │                 │
-│  │  Feedback  │ │ AgentLog   │ │ TxLog      │                 │
-│  └────────────┘ └────────────┘ └────────────┘                 │
-└──────────────────────────────────────────────────────────────────┘
+│                      SUPABASE (PostgreSQL)                      │
+│  ┌────────────┐ ┌────────────┐ ┌────────────┐                   │
+│  │   User     │ │  Escrow    │ │ Milestone  │                   │
+│  │  Feedback  │ │ AgentLog   │ │ TxLog      │                   │
+│  └────────────┘ └────────────┘ └────────────┘                   │
+└─────────────────────────────────────────────────────────────────┘
                            │
 ┌──────────────────────────┼──────────────────────────────────────┐
-│                      IPFS (Pinata)                               │
+│                      IPFS (Pinata)                              │
 │  • Decentralized file storage                                   │
 │  • Content addressing (CID)                                     │
 │  • Permanent work submissions                                   │
-└──────────────────────────────────────────────────────────────────┘
+└─────────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -137,8 +124,6 @@ All wallet addresses are verifiable on [Stellar Testnet Explorer](https://stella
 - Full User Table: All 30 users with wallet addresses, ratings, registration dates
 - API Health: <2% error rate, ~45ms avg response time
 
-**Screenshot**: See `docs/screenshots/` folder (metrics dashboard screenshot to be added)
-
 #### Monitoring Dashboard
 
 **Live Monitoring**: [https://stellar-escrow-flow.vercel.app/metrics/dashboard](https://stellar-escrow-flow.vercel.app/metrics/dashboard)
@@ -156,8 +141,6 @@ All wallet addresses are verifiable on [Stellar Testnet Explorer](https://stella
 - Agent logs for automated processes
 - Transaction log tracking
 
-**Screenshot**: See `docs/screenshots/` folder (monitoring dashboard screenshot to be added)
-
 #### Security Checklist
 
 **Coverage:**
@@ -167,17 +150,6 @@ All wallet addresses are verifiable on [Stellar Testnet Explorer](https://stella
 - ✅ Database & Storage Security (IPFS immutability, constraints, dynamic roles)
 - ✅ Advanced Security (fee sponsorship validation, on-chain indexing)
 
-#### Advanced Feature: Fee Sponsorship
-
-**Feature**: Gasless Transactions using Fee Bump
-
-**Description:**
-Backend sponsors transaction fees using Stellar's fee bump mechanism, allowing users to transact without holding XLM for fees. The sponsor account wraps user-signed transactions in a `FeeBumpTransaction`, validates them to prevent abuse, and submits them to the network.
-
-**Implementation:**
-- **Service**: `backend/src/services/sponsor.js`
-- **Endpoint**: `POST /milestone/sponsor-transaction`
-- **Configuration**: `SPONSOR_SECRET_KEY` environment variable
 
 **How It Works:**
 1. User signs transaction with their wallet (0 fee)
