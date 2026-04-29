@@ -21,6 +21,11 @@ A production-ready escrow platform built on Stellar's Soroban smart contracts wi
 | **Community contribution** | ✅ COMPLETE | Twitter post sharing project with Stellar community (link below) |
 | **Advanced feature** | ✅ COMPLETE | Fee Sponsorship - Gasless transactions via fee bump |
 | **15+ meaningful commits** | ✅ COMPLETE | 37 commits with conventional commit messages |
+## 🌐 Community Contribution
+
+Posted about Stellar Escrow Flow on X (Twitter) as part of the community outreach requirement.
+
+🔗 [View Post on X](https://x.com/i/status/2049550149089956164)
 
 ### 📊 User Onboarding Results
 
