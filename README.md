@@ -189,7 +189,7 @@ All wallet addresses are verifiable on [Stellar Testnet Explorer](https://stella
 
 **Endpoint**: `GET /metrics/dashboard` returns `totalIndexedEvents` count
 
-**Verification**: 38+ events indexed from contract `CBJNQEIZ2CGPI4TRGVGMGKA7UYWNMUB2WJ3JVXW4IFHVHOW3Y4KV6JWL`
+**Verification**: 38+ events indexed from contract `CB4E4WAJ5P72XUUWK5JR7KUK2YOEPU7H7BTFYIODK2WQUFLBRG2NF6AN`
 
 **Benefits:**
 - Real-time synchronization with blockchain state
@@ -249,8 +249,8 @@ Based on the 30+ user responses collected via Google Form, we have implemented t
 ## 📸 Application Screenshots
 
 **Smart Contract Verification**:  
-`CBJNQEIZ2CGPI4TRGVGMGKA7UYWNMUB2WJ3JVXW4IFHVHOW3Y4KV6JWL`  
-🔍 [Verify on Stellar Explorer](https://stellar.expert/explorer/testnet/contract/CBJNQEIZ2CGPI4TRGVGMGKA7UYWNMUB2WJ3JVXW4IFHVHOW3Y4KV6JWL)
+`CB4E4WAJ5P72XUUWK5JR7KUK2YOEPU7H7BTFYIODK2WQUFLBRG2NF6AN`  
+🔍 [Verify on Stellar Explorer](https://stellar.expert/explorer/testnet/contract/CB4E4WAJ5P72XUUWK5JR7KUK2YOEPU7H7BTFYIODK2WQUFLBRG2NF6AN)
 
 **🎥 Demo Video**: [Watch on YouTube](https://youtu.be/BK15qkZyVqo)
 
@@ -359,24 +359,6 @@ Based on the 30+ user responses collected via Google Form, we have implemented t
 
 
 ## 🚀 Quick Start
-
-### ⚠️ CRITICAL: Deploy Contract First!
-
-**Before running the application**, you MUST deploy the Soroban smart contract to testnet. The application will NOT work without a deployed contract when `USE_REAL_CONTRACT=true`.
-
-**Quick Deploy:**
-```bash
-cd contract
-cargo build --target wasm32-unknown-unknown --release
-stellar contract deploy \
-  --wasm target/wasm32-unknown-unknown/release/stellar_escrow.wasm \
-  --source-account YOUR_SECRET_KEY \
-  --network testnet
-```
-
-📖 **Full deployment guide**: [CONTRACT_DEPLOYMENT_GUIDE.md](CONTRACT_DEPLOYMENT_GUIDE.md)
-
----
 
 ### Prerequisites
 
@@ -1001,7 +983,7 @@ Special thanks to:
 - **Status**: ✅ Production Ready
 - **Users**: 30+ verified active users
 - **Commits**: 37 meaningful commits
-- **Contract**: CBJNQEIZ2CGPI4TRGVGMGKA7UYWNMUB2WJ3JVXW4IFHVHOW3Y4KV6JWL
+- **Contract**: CB4E4WAJ5P72XUUWK5JR7KUK2YOEPU7H7BTFYIODK2WQUFLBRG2NF6AN
 
 ---
 
