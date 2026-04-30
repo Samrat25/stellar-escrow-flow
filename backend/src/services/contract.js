@@ -9,6 +9,17 @@ const USE_REAL_CONTRACT = process.env.USE_REAL_CONTRACT === 'true';
 const CONTRACT_ID = process.env.CONTRACT_ID;
 const SOROBAN_RPC_URL = 'https://soroban-testnet.stellar.org';
 const HORIZON_URL = 'https://horizon-testnet.stellar.org';
+// Default to native XLM token contract on testnet
+const TOKEN_ADDRESS = process.env.TOKEN_ADDRESS === 'native' || !process.env.TOKEN_ADDRESS
+  ? 'CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC'
+  : process.env.TOKEN_ADDRESS;
+
+console.log('Contract Service Configuration:', {
+  USE_REAL_CONTRACT,
+  CONTRACT_ID,
+  TOKEN_ADDRESS,
+  SOROBAN_RPC_URL
+});
 
 // Create Soroban RPC server
 const sorobanServer = new StellarSDK.SorobanRpc.Server(SOROBAN_RPC_URL);
@@ -54,11 +65,8 @@ export class ContractService {
       // Build transaction
       const account = await horizonServer.loadAccount(clientWallet);
       
-      // Handle token address - for native XLM, use the native asset contract
-      // Default to native XLM contract on testnet if not specified
-      const tokenAddress = process.env.TOKEN_ADDRESS === 'native' || !process.env.TOKEN_ADDRESS
-        ? 'CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC' // Native XLM contract on testnet
-        : process.env.TOKEN_ADDRESS;
+      // Use the TOKEN_ADDRESS constant defined at module level
+      const tokenAddress = TOKEN_ADDRESS;
       
       console.log('Using token address:', tokenAddress);
       
