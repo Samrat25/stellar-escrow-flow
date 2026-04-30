@@ -56,6 +56,11 @@ export class ContractService {
         amount
       });
 
+      // Verify contract ID is valid
+      if (!this.contractId || this.contractId.length !== 56) {
+        throw new Error(`Invalid contract ID: ${this.contractId}. Must be 56 characters.`);
+      }
+
       // Build Soroban contract invocation
       const contract = new StellarSDK.Contract(this.contractId);
       
@@ -72,32 +77,49 @@ export class ContractService {
       
       // Create escrow with single milestone
       const escrowId = `escrow-${Date.now()}`;
-      const milestoneAmounts = [StellarSDK.nativeToScVal(amountInStroops, { type: 'i128' })];
+      
+      // Build milestone amounts vector properly
+      const milestoneAmounts = [amountInStroops];
+      
       const reviewWindowDays = 7; // Default 7 days as u32
       const deadlineTimestamp = Math.floor(Date.now() / 1000) + (30 * 86400); // 30 days from now
       
       console.log('Building transaction with params:', {
         escrowId,
         amountInStroops,
+        milestoneAmounts,
         reviewWindowDays,
         deadlineTimestamp
       });
+      
+      // Build parameters using xdr module directly for better control
+      const params = [
+        StellarSDK.xdr.ScVal.scvString(Buffer.from(escrowId)),
+        new StellarSDK.Address(clientWallet).toScVal(),
+        new StellarSDK.Address(freelancerWallet).toScVal(),
+        new StellarSDK.Address(tokenAddress).toScVal(),
+        StellarSDK.xdr.ScVal.scvVec([
+          StellarSDK.xdr.ScVal.scvI128(
+            new StellarSDK.xdr.Int128Parts({
+              lo: StellarSDK.xdr.Uint64.fromString(String(amountInStroops)),
+              hi: StellarSDK.xdr.Int64.fromString('0')
+            })
+          )
+        ]),
+        StellarSDK.xdr.ScVal.scvU32(reviewWindowDays),
+        StellarSDK.xdr.ScVal.scvU64(StellarSDK.xdr.Uint64.fromString(String(deadlineTimestamp)))
+      ];
       
       let transaction = new StellarSDK.TransactionBuilder(account, {
         fee: StellarSDK.BASE_FEE,
         networkPassphrase: NETWORK_PASSPHRASE,
       })
         .addOperation(
-          contract.call(
-            'create_escrow',
-            StellarSDK.nativeToScVal(escrowId, { type: 'string' }),
-            StellarSDK.Address.fromString(clientWallet).toScVal(),
-            StellarSDK.Address.fromString(freelancerWallet).toScVal(),
-            StellarSDK.Address.fromString(tokenAddress).toScVal(),
-            StellarSDK.nativeToScVal(milestoneAmounts, { type: 'vec' }),
-            StellarSDK.nativeToScVal(reviewWindowDays, { type: 'u32' }),
-            StellarSDK.nativeToScVal(deadlineTimestamp, { type: 'u64' })
-          )
+          StellarSDK.Operation.invokeContractFunction({
+            contract: this.contractId,
+            function: 'create_escrow',
+            args: params
+          })
         )
         .setTimeout(180)
         .build();
@@ -111,7 +133,21 @@ export class ContractService {
         console.log('Transaction simulated and assembled successfully');
       } else {
         console.error('Simulation failed:', JSON.stringify(simulatedTx, null, 2));
-        const errorMessage = simulatedTx.error || 'Transaction simulation failed';
+        
+        // Provide detailed error message
+        let errorMessage = 'Transaction simulation failed';
+        if (simulatedTx.error) {
+          errorMessage += `: ${simulatedTx.error}`;
+        }
+        if (simulatedTx.events && simulatedTx.events.length > 0) {
+          errorMessage += `. Events: ${JSON.stringify(simulatedTx.events)}`;
+        }
+        
+        // Check if contract doesn't exist
+        if (simulatedTx.error && simulatedTx.error.includes('MissingValue')) {
+          errorMessage = `Contract not found at address ${this.contractId}. Please deploy the contract first.`;
+        }
+        
         throw new Error(errorMessage);
       }
 
@@ -130,7 +166,16 @@ export class ContractService {
     } catch (error) {
       console.error('Real milestone creation error:', error);
       console.error('Error stack:', error.stack);
-      return { success: false, error: error.message };
+      
+      // Provide user-friendly error messages
+      let userMessage = error.message;
+      if (error.message.includes('Bad union switch')) {
+        userMessage = `XDR parsing error. This usually means the contract at ${this.contractId} doesn't exist or isn't properly deployed. Please verify the contract is deployed on testnet.`;
+      } else if (error.message.includes('Account not found')) {
+        userMessage = `Wallet ${clientWallet} not found. Please fund it with XLM from Friendbot first.`;
+      }
+      
+      return { success: false, error: userMessage };
     }
   }
 

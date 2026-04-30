@@ -360,6 +360,24 @@ Based on the 30+ user responses collected via Google Form, we have implemented t
 
 ## 🚀 Quick Start
 
+### ⚠️ CRITICAL: Deploy Contract First!
+
+**Before running the application**, you MUST deploy the Soroban smart contract to testnet. The application will NOT work without a deployed contract when `USE_REAL_CONTRACT=true`.
+
+**Quick Deploy:**
+```bash
+cd contract
+cargo build --target wasm32-unknown-unknown --release
+stellar contract deploy \
+  --wasm target/wasm32-unknown-unknown/release/stellar_escrow.wasm \
+  --source-account YOUR_SECRET_KEY \
+  --network testnet
+```
+
+📖 **Full deployment guide**: [CONTRACT_DEPLOYMENT_GUIDE.md](CONTRACT_DEPLOYMENT_GUIDE.md)
+
+---
+
 ### Prerequisites
 
 - Node.js v18+
