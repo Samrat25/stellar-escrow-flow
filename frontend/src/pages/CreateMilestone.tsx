@@ -62,7 +62,7 @@ const CreateMilestone = () => {
     setLoading(true);
 
     try {
-      // Step 1: Create milestone (get XDR for signing or use fallback)
+      // Step 1: Create milestone - get XDR for signing
       const createResult = await api.createMilestone({
         clientWallet: address,
         freelancerWallet,
@@ -75,16 +75,7 @@ const CreateMilestone = () => {
         throw new Error(createResult.error || 'Failed to create milestone');
       }
 
-      // If used fallback (contract unavailable), milestone is already created
-      if (createResult.usedFallback) {
-        toast.success('Milestone created successfully!', {
-          description: 'Contract integration pending - you can still fund and use the milestone'
-        });
-        navigate('/dashboard');
-        return;
-      }
-
-      // If needs signing, sign the transaction
+      // Contract interaction requires signing
       if (createResult.needsSigning && createResult.xdr) {
         toast.info('Please sign the transaction in your wallet');
         
@@ -147,13 +138,9 @@ const CreateMilestone = () => {
         } else {
           navigate('/dashboard');
         }
-      } else if (createResult.milestone?.id) {
-        // If fallback was used, navigate to milestone detail
-        toast.success('Milestone created!');
-        navigate(`/milestone/${createResult.milestone.id}`);
       } else {
-        toast.success('Milestone created!');
-        navigate('/dashboard');
+        // Should not reach here - contract always requires signing
+        throw new Error('Unexpected response from server');
       }
     } catch (error: any) {
       console.error('Create milestone error:', error);
