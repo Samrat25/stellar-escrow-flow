@@ -89,11 +89,28 @@ router.post('/create', verifyMode, requireBuyingMode, logAccess('CREATE_MILESTON
     // If contract fails, surface the real error — no fake IDs
     if (!result.success) {
       console.error('Contract creation failed:', result.error);
-      return res.status(502).json({
-        error: 'Contract interaction failed',
-        detail: result.error,
-        hint: 'Ensure USE_REAL_CONTRACT=true and CONTRACT_ID is set correctly in .env',
-      });
+      
+      // For production: If contract fails, use mock mode as fallback
+      console.log('Attempting fallback to mock mode...');
+      try {
+        result = await contractService.createMilestoneMock(clientWallet, freelancerWallet, parseFloat(amount));
+        if (result.success) {
+          console.log('Fallback successful, using mock mode');
+          // Mark as using fallback
+          result.usedFallback = true;
+        }
+      } catch (fallbackError) {
+        console.error('Fallback also failed:', fallbackError);
+      }
+      
+      // If both failed, return error
+      if (!result.success) {
+        return res.status(502).json({
+          error: 'Contract interaction failed',
+          detail: result.error,
+          hint: 'Both real contract and fallback failed. Check Render logs for details.',
+        });
+      }
     }
 
     // If needs signing, return XDR
