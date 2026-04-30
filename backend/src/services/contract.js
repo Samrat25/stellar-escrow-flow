@@ -256,12 +256,26 @@ export class ContractService {
         .build();
 
       // Simulate transaction
+      console.log('Simulating fund milestone transaction...');
       const simulatedTx = await sorobanServer.simulateTransaction(transaction);
       
       if (StellarSDK.SorobanRpc.Api.isSimulationSuccess(simulatedTx)) {
         transaction = StellarSDK.SorobanRpc.assembleTransaction(transaction, simulatedTx).build();
+        console.log('Fund transaction simulated successfully');
       } else {
-        throw new Error('Transaction simulation failed');
+        console.error('Fund simulation failed:', JSON.stringify(simulatedTx, null, 2));
+        
+        let errorMessage = 'Transaction simulation failed';
+        if (simulatedTx.error) {
+          errorMessage += `: ${simulatedTx.error}`;
+        }
+        
+        // Check for common errors
+        if (simulatedTx.error && simulatedTx.error.includes('MissingValue')) {
+          errorMessage = `Escrow not found on-chain. The escrow must be created on-chain first before funding. Please complete the create_escrow transaction.`;
+        }
+        
+        throw new Error(errorMessage);
       }
 
       const xdr = transaction.toXDR();
@@ -386,8 +400,17 @@ export class ContractService {
         transaction = StellarSDK.SorobanRpc.assembleTransaction(transaction, simulatedTx).build();
         console.log('Transaction simulated and assembled successfully');
       } else {
-        console.error('Simulation failed:', simulatedTx);
-        throw new Error('Transaction simulation failed');
+        console.error('Simulation failed:', JSON.stringify(simulatedTx, null, 2));
+        
+        let errorMessage = 'Transaction simulation failed';
+        if (simulatedTx.error) {
+          errorMessage += `: ${simulatedTx.error}`;
+        }
+        if (simulatedTx.error && simulatedTx.error.includes('MissingValue')) {
+          errorMessage = `Escrow not found on-chain. Please ensure the escrow was created on-chain first.`;
+        }
+        
+        throw new Error(errorMessage);
       }
 
       const xdr = transaction.toXDR();
@@ -453,8 +476,17 @@ export class ContractService {
         transaction = StellarSDK.SorobanRpc.assembleTransaction(transaction, simulatedTx).build();
         console.log('Transaction simulated and assembled successfully');
       } else {
-        console.error('Simulation failed:', simulatedTx);
-        throw new Error('Transaction simulation failed');
+        console.error('Simulation failed:', JSON.stringify(simulatedTx, null, 2));
+        
+        let errorMessage = 'Transaction simulation failed';
+        if (simulatedTx.error) {
+          errorMessage += `: ${simulatedTx.error}`;
+        }
+        if (simulatedTx.error && simulatedTx.error.includes('MissingValue')) {
+          errorMessage = `Escrow not found on-chain. Please ensure the escrow was created and funded on-chain first.`;
+        }
+        
+        throw new Error(errorMessage);
       }
 
       const xdr = transaction.toXDR();
