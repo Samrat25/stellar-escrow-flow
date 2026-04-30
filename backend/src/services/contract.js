@@ -73,8 +73,8 @@ export class ContractService {
       // Create escrow with single milestone
       const escrowId = `escrow-${Date.now()}`;
       const milestoneAmounts = [StellarSDK.nativeToScVal(amountInStroops, { type: 'i128' })];
-      const reviewWindowDays = 7; // Default 7 days
-      const deadlineTimestamp = Math.floor(Date.now() / 1000) + (reviewWindowDays * 86400);
+      const reviewWindowDays = 7; // Default 7 days as u32
+      const deadlineTimestamp = Math.floor(Date.now() / 1000) + (30 * 86400); // 30 days from now
       
       console.log('Building transaction with params:', {
         escrowId,
