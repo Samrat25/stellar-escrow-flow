@@ -41,6 +41,18 @@ const CreateMilestone = () => {
       return;
     }
 
+    // Validate that client and freelancer are different
+    if (freelancerWallet.trim().toUpperCase() === address.toUpperCase()) {
+      toast.error('Client and freelancer must be different wallets');
+      return;
+    }
+
+    // Validate Stellar address format
+    if (!freelancerWallet.match(/^G[A-Z0-9]{55}$/)) {
+      toast.error('Invalid Stellar wallet address format');
+      return;
+    }
+
     const amountNum = parseFloat(amount);
     if (isNaN(amountNum) || amountNum <= 0) {
       toast.error('Invalid amount');
@@ -215,9 +227,15 @@ const CreateMilestone = () => {
                   onChange={(e) => setFreelancerWallet(e.target.value)}
                   disabled={loading}
                   required
+                  className={freelancerWallet && freelancerWallet.trim().toUpperCase() === address?.toUpperCase() ? 'border-red-500' : ''}
                 />
+                {freelancerWallet && freelancerWallet.trim().toUpperCase() === address?.toUpperCase() && (
+                  <p className="text-xs text-red-500">
+                    ⚠️ Client and freelancer must be different wallets
+                  </p>
+                )}
                 <p className="text-xs text-muted-foreground">
-                  The Stellar wallet address of the freelancer
+                  The Stellar wallet address of the freelancer (must be different from your wallet)
                 </p>
               </div>
 
