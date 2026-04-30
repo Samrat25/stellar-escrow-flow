@@ -38,6 +38,13 @@ export class ContractService {
 
   async createMilestoneReal(clientWallet, freelancerWallet, amount) {
     try {
+      console.log('Creating milestone with real contract:', {
+        contractId: this.contractId,
+        clientWallet,
+        freelancerWallet,
+        amount
+      });
+
       // Build Soroban contract invocation
       const contract = new StellarSDK.Contract(this.contractId);
       
@@ -48,15 +55,25 @@ export class ContractService {
       const account = await horizonServer.loadAccount(clientWallet);
       
       // Handle token address - for native XLM, use the native asset contract
-      const tokenAddress = process.env.TOKEN_ADDRESS === 'native' 
+      // Default to native XLM contract on testnet if not specified
+      const tokenAddress = process.env.TOKEN_ADDRESS === 'native' || !process.env.TOKEN_ADDRESS
         ? 'CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC' // Native XLM contract on testnet
         : process.env.TOKEN_ADDRESS;
+      
+      console.log('Using token address:', tokenAddress);
       
       // Create escrow with single milestone
       const escrowId = `escrow-${Date.now()}`;
       const milestoneAmounts = [StellarSDK.nativeToScVal(amountInStroops, { type: 'i128' })];
       const reviewWindowDays = 7; // Default 7 days
       const deadlineTimestamp = Math.floor(Date.now() / 1000) + (reviewWindowDays * 86400);
+      
+      console.log('Building transaction with params:', {
+        escrowId,
+        amountInStroops,
+        reviewWindowDays,
+        deadlineTimestamp
+      });
       
       let transaction = new StellarSDK.TransactionBuilder(account, {
         fee: StellarSDK.BASE_FEE,
@@ -85,11 +102,14 @@ export class ContractService {
         transaction = StellarSDK.SorobanRpc.assembleTransaction(transaction, simulatedTx).build();
         console.log('Transaction simulated and assembled successfully');
       } else {
-        console.error('Simulation failed:', simulatedTx);
-        throw new Error('Transaction simulation failed');
+        console.error('Simulation failed:', JSON.stringify(simulatedTx, null, 2));
+        const errorMessage = simulatedTx.error || 'Transaction simulation failed';
+        throw new Error(errorMessage);
       }
 
       const xdr = transaction.toXDR();
+      
+      console.log('Transaction ready for signing, XDR length:', xdr.length);
       
       return {
         success: true,
@@ -101,6 +121,7 @@ export class ContractService {
       };
     } catch (error) {
       console.error('Real milestone creation error:', error);
+      console.error('Error stack:', error.stack);
       return { success: false, error: error.message };
     }
   }
